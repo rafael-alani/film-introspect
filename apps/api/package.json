@@ -1,0 +1,26 @@
+{
+  "name": "@film-introspect/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env --watch src/index.ts",
+    "start": "bun --env-file=../../.env src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun --sourcemap=external",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun --env-file=../../.env src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@film-introspect/contracts": "workspace:*",
+    "@hono/zod-validator": "latest",
+    "better-auth": "latest",
+    "drizzle-orm": "latest",
+    "hono": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "drizzle-kit": "latest",
+    "typescript": "latest"
+  }
+}

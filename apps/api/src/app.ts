@@ -1,0 +1,446 @@
+import {
+  appConfigSchema,
+  connectionsResponseSchema,
+  createNoteInputSchema,
+  healthResponseSchema,
+  mediaListResponseSchema,
+  mediaSchema,
+  metadataLookupInputSchema,
+  metadataLookupResponseSchema,
+  noteSchema,
+  notesResponseSchema,
+  playbackSnapshotSchema,
+  sessionsResponseSchema,
+  subtitlesResponseSchema,
+  updateNoteInputSchema,
+  updateRuntimeInputSchema,
+  updateUserSettingsSchema,
+  userSettingsSchema,
+} from "@film-introspect/contracts";
+import { zValidator } from "@hono/zod-validator";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
+import { streamSSE } from "hono/streaming";
+import { z } from "zod";
+import { auth } from "./auth";
+import { env } from "./env";
+import { errorResponse } from "./http";
+import { jellyfinClient } from "./integrations/jellyfin/client";
+import { jellyfinSync } from "./integrations/jellyfin/sync";
+import { omdbClient } from "./integrations/omdb";
+import {
+  getConnectionStatuses,
+  getPlaybackSnapshot,
+  getSessions,
+  getSubtitles,
+  selectSession,
+} from "./services/playback";
+import {
+  createNote,
+  deleteNote,
+  getSettings,
+  hasJellyfinItem,
+  listMedia,
+  listNotes,
+  updateNote,
+  updateRuntime,
+  updateSettings,
+} from "./services/repository";
+import { LOCAL_APP_USER } from "./services/local-user";
+
+type Variables = {
+  authUser: {
+    id: string;
+    name: string;
+    email: string;
+    image: string | null;
+  };
+};
+
+type AppContext = { Variables: Variables };
+
+export const app = new Hono<AppContext>({ strict: false });
+
+app.use("*", logger());
+app.use("*", secureHeaders({ crossOriginResourcePolicy: "cross-origin" }));
+app.use(
+  "*",
+  cors({
+    origin: env.WEB_ORIGIN,
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+    maxAge: 600,
+  }),
+);
+
+app.get("/api/health", (c) =>
+  c.json(
+    healthResponseSchema.parse({
+      ok: true,
+      version: "0.1.0",
+      time: new Date().toISOString(),
+    }),
+  ),
+);
+
+app.get("/api/config", (c) =>
+  c.json(
+    appConfigSchema.parse({
+      authEnabled: env.APP_AUTH_ENABLED,
+      demoMode: env.DEMO_MODE,
+    }),
+  ),
+);
+
+app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+const api = new Hono<AppContext>();
+
+api.use("*", async (c, next) => {
+  if (!env.APP_AUTH_ENABLED) {
+    c.set("authUser", LOCAL_APP_USER);
+    await next();
+    return;
+  }
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session)
+    return errorResponse(c, 401, "UNAUTHORIZED", "Sign in to continue");
+  c.set("authUser", {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image ?? null,
+  });
+  await next();
+});
+
+api.get("/playback", async (c) => {
+  const user = c.get("authUser");
+  const settings = await getSettings(user.id);
+  return c.json(
+    playbackSnapshotSchema.parse(await getPlaybackSnapshot(user.id, settings)),
+  );
+});
+
+api.get("/playback/sessions", async (c) => {
+  const settings = await getSettings(c.get("authUser").id);
+  return c.json(sessionsResponseSchema.parse(getSessions(settings)));
+});
+
+api.patch(
+  "/playback/sessions",
+  zValidator(
+    "json",
+    z.object({ sessionId: z.string().min(1).nullable() }),
+    (result, c) => {
+      if (!result.success) {
+        return errorResponse(
+          c,
+          400,
+          "VALIDATION_ERROR",
+          "Invalid session selection",
+          result.error.issues,
+        );
+      }
+    },
+  ),
+  async (c) => {
+    const user = c.get("authUser");
+    const settings = await getSettings(user.id);
+    const response = await selectSession(
+      user.id,
+      settings,
+      c.req.valid("json").sessionId,
+    );
+    if (!response)
+      return errorResponse(
+        c,
+        404,
+        "SESSION_NOT_FOUND",
+        "Playback session not found",
+      );
+    return c.json(sessionsResponseSchema.parse(response));
+  },
+);
+
+api.get("/playback/subtitles", async (c) => {
+  const settings = await getSettings(c.get("authUser").id);
+  try {
+    return c.json(subtitlesResponseSchema.parse(await getSubtitles(settings)));
+  } catch (error) {
+    return errorResponse(
+      c,
+      502,
+      "SUBTITLES_UNAVAILABLE",
+      error instanceof Error
+        ? error.message
+        : "Jellyfin subtitles are unavailable",
+    );
+  }
+});
+
+api.get("/playback/events", async (c) => {
+  const user = c.get("authUser");
+  return streamSSE(c, async (stream) => {
+    let active = true;
+    let writeQueue = Promise.resolve();
+    const unsubscribe = jellyfinSync.subscribe((state) => {
+      writeQueue = writeQueue
+        .then(async () => {
+          if (!active) return;
+          const snapshot = playbackSnapshotSchema.parse(
+            await getPlaybackSnapshot(user.id, await getSettings(user.id)),
+          );
+          await stream.writeSSE({
+            event: "playback",
+            id: state.observedAt,
+            data: JSON.stringify(snapshot),
+          });
+        })
+        .catch(() => {
+          active = false;
+        });
+    });
+
+    stream.onAbort(() => {
+      active = false;
+      unsubscribe();
+    });
+
+    try {
+      while (active && !stream.aborted) {
+        // Bun closes idle HTTP streams after roughly ten seconds by default.
+        await stream.sleep(5_000);
+        if (active && !stream.aborted) {
+          await stream.writeSSE({
+            event: "heartbeat",
+            data: new Date().toISOString(),
+          });
+        }
+      }
+    } finally {
+      active = false;
+      unsubscribe();
+    }
+  });
+});
+
+api.get("/connections", async (c) =>
+  c.json(connectionsResponseSchema.parse(await getConnectionStatuses())),
+);
+
+api.get("/settings", async (c) =>
+  c.json(userSettingsSchema.parse(await getSettings(c.get("authUser").id))),
+);
+
+api.patch(
+  "/settings",
+  zValidator("json", updateUserSettingsSchema, (result, c) => {
+    if (!result.success) {
+      return errorResponse(
+        c,
+        400,
+        "VALIDATION_ERROR",
+        "Invalid settings",
+        result.error.issues,
+      );
+    }
+  }),
+  async (c) =>
+    c.json(
+      userSettingsSchema.parse(
+        await updateSettings(c.get("authUser").id, c.req.valid("json")),
+      ),
+    ),
+);
+
+api.get("/media", async (c) =>
+  c.json(
+    mediaListResponseSchema.parse({
+      items: await listMedia(c.get("authUser").id),
+    }),
+  ),
+);
+
+api.get("/media/:jellyfinItemId/image", async (c) => {
+  const itemId = c.req.param("jellyfinItemId");
+  if (!(await hasJellyfinItem(c.get("authUser").id, itemId))) {
+    return errorResponse(c, 404, "MEDIA_NOT_FOUND", "Media timeline not found");
+  }
+  if (env.DEMO_MODE && itemId === "demo-movie") {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a33b20"/><stop offset=".5" stop-color="#4a1818"/><stop offset="1" stop-color="#111513"/></linearGradient><filter id="n"><feTurbulence baseFrequency=".9" numOctaves="4" stitchTiles="stitch"/><feBlend mode="soft-light" in2="SourceGraphic"/></filter></defs><rect width="600" height="900" fill="url(#g)"/><circle cx="420" cy="260" r="180" fill="#f0bf7a" opacity=".18"/><rect width="600" height="900" filter="url(#n)" opacity=".2"/><text x="48" y="760" fill="#f6eee1" font-family="serif" font-size="50">IN THE MOOD</text><text x="48" y="818" fill="#f6eee1" font-family="serif" font-size="50">FOR LOVE</text></svg>`;
+    return new Response(svg, {
+      headers: {
+        "Content-Type": "image/svg+xml",
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+  }
+  try {
+    const upstream = await jellyfinClient.getImage(
+      itemId,
+      new URL(c.req.url).searchParams,
+    );
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("Content-Type") ?? "image/jpeg",
+        "Cache-Control": "private, max-age=3600, stale-while-revalidate=86400",
+      },
+    });
+  } catch (error) {
+    return errorResponse(
+      c,
+      502,
+      "IMAGE_UNAVAILABLE",
+      error instanceof Error ? error.message : "Jellyfin image is unavailable",
+    );
+  }
+});
+
+api.get("/media/:mediaId/notes", async (c) => {
+  const result = await listNotes(c.get("authUser").id, c.req.param("mediaId"));
+  if (!result)
+    return errorResponse(c, 404, "MEDIA_NOT_FOUND", "Media timeline not found");
+  return c.json(notesResponseSchema.parse({ notes: result }));
+});
+
+api.post(
+  "/media/:mediaId/notes",
+  zValidator("json", createNoteInputSchema, (result, c) => {
+    if (!result.success) {
+      return errorResponse(
+        c,
+        400,
+        "VALIDATION_ERROR",
+        "Invalid note",
+        result.error.issues,
+      );
+    }
+  }),
+  async (c) => {
+    const note = await createNote(
+      c.get("authUser").id,
+      c.req.param("mediaId"),
+      c.req.valid("json"),
+    );
+    if (!note)
+      return errorResponse(
+        c,
+        404,
+        "MEDIA_NOT_FOUND",
+        "Media timeline not found",
+      );
+    return c.json(noteSchema.parse(note), 201);
+  },
+);
+
+api.patch(
+  "/media/:mediaId/runtime",
+  zValidator("json", updateRuntimeInputSchema, (result, c) => {
+    if (!result.success) {
+      return errorResponse(
+        c,
+        400,
+        "VALIDATION_ERROR",
+        "Invalid runtime",
+        result.error.issues,
+      );
+    }
+  }),
+  async (c) => {
+    const media = await updateRuntime(
+      c.get("authUser").id,
+      c.req.param("mediaId"),
+      c.req.valid("json"),
+    );
+    if (!media)
+      return errorResponse(
+        c,
+        404,
+        "MEDIA_NOT_FOUND",
+        "Media timeline not found",
+      );
+    return c.json(mediaSchema.parse(media));
+  },
+);
+
+api.patch(
+  "/notes/:noteId",
+  zValidator("json", updateNoteInputSchema, (result, c) => {
+    if (!result.success) {
+      return errorResponse(
+        c,
+        400,
+        "VALIDATION_ERROR",
+        "Invalid note update",
+        result.error.issues,
+      );
+    }
+  }),
+  async (c) => {
+    const note = await updateNote(
+      c.get("authUser").id,
+      c.req.param("noteId"),
+      c.req.valid("json"),
+    );
+    if (!note) return errorResponse(c, 404, "NOTE_NOT_FOUND", "Note not found");
+    return c.json(noteSchema.parse(note));
+  },
+);
+
+api.delete("/notes/:noteId", async (c) => {
+  const deleted = await deleteNote(c.get("authUser").id, c.req.param("noteId"));
+  if (!deleted)
+    return errorResponse(c, 404, "NOTE_NOT_FOUND", "Note not found");
+  return c.body(null, 204);
+});
+
+api.post(
+  "/metadata/lookup",
+  zValidator("json", metadataLookupInputSchema, (result, c) => {
+    if (!result.success) {
+      return errorResponse(
+        c,
+        400,
+        "VALIDATION_ERROR",
+        "Invalid IMDb id",
+        result.error.issues,
+      );
+    }
+  }),
+  async (c) => {
+    try {
+      return c.json(
+        metadataLookupResponseSchema.parse(
+          await omdbClient.lookup(c.req.valid("json").imdbId),
+        ),
+      );
+    } catch (error) {
+      return errorResponse(
+        c,
+        omdbClient.configured ? 502 : 503,
+        "METADATA_UNAVAILABLE",
+        error instanceof Error ? error.message : "Metadata lookup failed",
+      );
+    }
+  },
+);
+
+app.route("/api", api);
+
+app.notFound((c) => errorResponse(c, 404, "NOT_FOUND", "Route not found"));
+app.onError((error, c) => {
+  console.error(error);
+  return errorResponse(
+    c,
+    500,
+    "INTERNAL_ERROR",
+    env.NODE_ENV === "production" ? "Something went wrong" : error.message,
+  );
+});
+
+export type AppType = typeof app;

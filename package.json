@@ -1,0 +1,25 @@
+{
+  "name": "film-introspect",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"bun run --cwd apps/api dev\" \"bun run --cwd apps/web dev\"",
+    "build": "bun run --filter '@film-introspect/*' build",
+    "typecheck": "bun run --filter '@film-introspect/*' typecheck",
+    "test": "bun test",
+    "db:generate": "bun run --cwd apps/api db:generate",
+    "db:migrate": "bun run --cwd apps/api db:migrate",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "concurrently": "latest",
+    "prettier": "latest",
+    "typescript": "latest"
+  }
+}
