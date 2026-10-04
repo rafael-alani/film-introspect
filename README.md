@@ -109,6 +109,10 @@ All can be adjusted in the UI except the server polling/cache settings.
 
 ## Docker Compose
 
+The private homelab deployment follows this repository's `staging` branch.
+See [the staging workflow](docs/staging.md) for its URL, automatic deployments,
+demo settings, and rollback behavior.
+
 Create `.env`, set at least `BETTER_AUTH_SECRET`, `JELLYFIN_URL`, and `JELLYFIN_API_KEY`, then run:
 
 ```bash
