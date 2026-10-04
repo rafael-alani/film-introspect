@@ -14,6 +14,8 @@ ENV NODE_ENV=production \
     DATABASE_PATH=/data/introspect.db
 
 COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=dependencies /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=dependencies /app/packages/contracts/node_modules ./packages/contracts/node_modules
 COPY package.json tsconfig.base.json ./
 COPY packages/contracts ./packages/contracts
 COPY apps/api ./apps/api
