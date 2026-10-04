@@ -1,11 +1,11 @@
 FROM oven/bun:1.3.14 AS build
 WORKDIR /app
 
-COPY package.json tsconfig.base.json ./
+COPY package.json bun.lock tsconfig.base.json ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
-RUN bun install
+RUN bun install --frozen-lockfile
 
 COPY packages/contracts ./packages/contracts
 COPY apps/web ./apps/web
