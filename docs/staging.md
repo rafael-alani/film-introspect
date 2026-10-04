@@ -1,7 +1,7 @@
 # Homelab staging
 
 The `staging` branch runs at
-https://film-introspect-staging.rafael.media on the private LAN/Tailscale network.
+https://film-introspect.staging.rafael.media on the private LAN/Tailscale network.
 Push a commit to this branch to deploy it; the staging guest checks roughly
 every two minutes, then builds the API and frontend from that exact commit.
 `main` is not deployed by this environment.
