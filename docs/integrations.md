@@ -1,6 +1,6 @@
 # Jellyfin, Bazarr, and runtime research
 
-Research was validated on 2026-07-11 against Jellyfin Server 10.11.11 and Bazarr 1.6.0. The implementation accepts PascalCase and camelCase DTO profiles and keeps its runtime schemas intentionally narrow so additive fields and the Jellyfin 12 API do not break it.
+Research was validated on 2026-07-11 against Jellyfin Server 10.11.11 and Bazarr 1.6.0. This historical research date has not been refreshed. The implementation accepts PascalCase and camelCase DTO profiles and reads a narrow set of fields to tolerate additive changes; this does not establish compatibility with an untested server version. See [current implementation](architecture.md) and [verification limits](development.md#verification).
 
 ## Jellyfin
 
@@ -12,7 +12,7 @@ REST and the backend WebSocket use:
 Authorization: MediaBrowser Client="Introspect", Device="Introspect server", DeviceId="film-introspect-backend", Version="0.1.0", Token="..."
 ```
 
-This avoids legacy `X-Emby-*` headers and query-string keys. A Jellyfin API key can inspect all sessions, so session DTOs are filtered and normalized before reaching a browser. `JELLYFIN_USER_ID` is the strongest scope: when it is absent, an authenticated app user must explicitly pair a session before playback details are exposed, and the resulting user/device mapping is persisted to that app account.
+This avoids legacy `X-Emby-*` headers and query-string keys. A Jellyfin API key can inspect all sessions, so session DTOs are filtered and normalized before reaching a browser. Without a configured or saved Jellyfin user, the ordinary workflow requires explicit pairing before live playback details are exposed. The user/device mapping is saved to the current app profile, including Local viewer when app authentication is disabled. The current settings API has [trust limitations](architecture.md#authentication-and-trust); pairing is not proof of Jellyfin account ownership.
 
 Primary sources:
 
@@ -77,11 +77,13 @@ Provider search and download calls run background jobs, consume provider quotas,
 
 ## Runtime and alternate editions
 
-Authority order is:
+The intended runtime authority in the original research was:
 
 1. selected Jellyfin media source/item `RunTimeTicks`;
 2. explicit per-source user override;
 3. optional external title runtime only when local runtime is missing.
+
+The current code differs: a manual override takes precedence, and OMDb is an explicit lookup/save operation whose result is not preserved across playback resolution. The implementation reads runtime from the session's `NowPlayingItem`; it does not separately resolve file duration from media-source metadata. [Timeline and runtime rules](architecture.md#timeline-and-runtime-rules) are authoritative for implemented behavior, and the [user guide](../USER_DOC.md#manage-runtimes-and-editions) describes the available controls.
 
 OMDb's `Runtime` is a rounded title-level string such as `"136 min"`. It is not edition-specific, and OMDb is independent of IMDb. IMDb's downloadable non-commercial TSV similarly describes a title's primary runtime, while IMDb's supported online GraphQL product is licensed through AWS Data Exchange. Neither solves cut detection.
 
