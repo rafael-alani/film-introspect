@@ -61,6 +61,10 @@ The generation script does not explicitly load the root `.env` the way migration
 
 ## Verification
 
+These are dated checks of specific revisions, not a claim about a deployed release.
+
+### Initial documentation review — 2026-10-13
+
 Documentation review on **2026-10-13** inspected branch `main`, base revision `11d22da0b943b173bfb13a71c52f804000cfdb58` (before these documentation edits), on macOS/Darwin arm64 with Bun 1.3.14 and existing installed dependencies.
 
 | Method                                            | Result and scope                                                                                                                          |
@@ -86,3 +90,9 @@ This follow-up used base revision `cb855f68a6a049456e29f3a7c662e6b26bf073d4`, ma
 - Checked 88 local links/anchors across the seven repository Markdown files and all five shell blocks with `bash -n`. Repository formatting and `git diff --check` passed.
 
 These checks cover the snippets and sampled ownership behavior. They did not exercise a browser console, Docker, persistent backup/restore, or live playback, and do not supersede the earlier verification limits. Application source was unchanged; the unit suite, typecheck, and build were not rerun for this documentation-only follow-up.
+
+### Documentation skills review — 2026-10-13
+
+Reviewed all seven Markdown guides and `.env.example` against `main` at `edc67fe05089817a6d7ccd992110dd60f3702111` on macOS/Darwin arm64, Bun 1.3.14, with existing dependencies. Source inspection and documentation walkthroughs covered setup, pairing, notes, subtitles, runtimes, preferences, demo, and recovery. The existing guide structure and agent maintenance rule remained sufficient.
+
+`bun run format:check`, `git diff --check`, 89 local links/anchors, and `bash -n` for five shell blocks passed. Referenced paths and scripts were checked. Capabilities, restore snippets, constraints, and historical evidence were preserved. Application code and configuration values were unchanged; runtime tests, browser journeys, deployment, restore, and upstream compatibility were not rechecked.

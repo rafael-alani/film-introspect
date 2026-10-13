@@ -2,7 +2,7 @@
 
 Introspect is a mobile-first second-screen journal for movies and shows. It follows a Jellyfin playback session, mirrors play/pause/seek state, displays nearby subtitle lines, and saves notes at the current playhead.
 
-This is a Bun workspace with a React/Vite web app, a Hono API, shared Zod contracts, and SQLite storage. The current implementation supports timed notes, per-media-source timelines, runtime overrides, optional Introspect accounts, Bazarr connection checks, and manual OMDb runtime lookup. See the [user guide](USER_DOC.md) for workflows and restrictions.
+This Bun workspace contains a React/Vite web app, a Hono API, shared Zod contracts, and SQLite storage. See the [user guide](USER_DOC.md#capability-index) for supported capabilities, workflows, and restrictions.
 
 ## Quick start
 
@@ -16,11 +16,10 @@ bun install --frozen-lockfile
 Edit `.env` before starting. Set `JELLYFIN_URL` to an address reachable from the API and supply `JELLYFIN_API_KEY`. Set `JELLYFIN_USER_ID` to scope normal session selection. To preview without Jellyfin, use `DEMO_MODE=true` and leave `JELLYFIN_USER_ID` empty. Reuse an existing `.env` instead of overwriting it.
 
 ```bash
-bun run db:migrate
 bun dev
 ```
 
-Open [localhost:5173](http://localhost:5173). For real playback, start a title in Jellyfin and choose the device in **Settings → Session to follow**. The API listens on port 3001; Vite proxies `/api` to it. Startup also applies migrations automatically.
+Open [localhost:5173](http://localhost:5173). For real playback, start a title in Jellyfin and choose the device in **Settings → Session to follow**. The API listens on port 3001; Vite proxies `/api` to it. API startup applies migrations automatically.
 
 `APP_AUTH_ENABLED=false` is the default: everyone who can reach the app shares the **Local viewer** profile and its notes. Enable accounts for separate collections; Introspect credentials are separate from Jellyfin credentials. See [authentication and access](docs/operations.md#authentication-and-access) before exposing the app beyond a trusted network.
 
