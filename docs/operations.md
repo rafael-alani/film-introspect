@@ -113,7 +113,59 @@ Rehearse into a separate deployment before replacing working data. The following
 1. Prepare a separate checkout at the revision recorded in the backup. Prepare a protected restore environment file with a different `WEB_PORT` and matching `PUBLIC_URL`, the intended auth mode, and the saved secret. Keep test access private and disable optional external integrations if they are not needed for the check.
 2. Set `restore_env` and `backup_dir` to the actual absolute paths, then create stopped containers with `docker compose --env-file "$restore_env" -p introspect-restore create --build`.
 3. Copy the entire saved directory into the fresh volume with `docker compose --env-file "$restore_env" -p introspect-restore cp "$backup_dir/data/." api:/data/`. Do not merge a backup with a previously used database/WAL set.
-4. Start it with `docker compose --env-file "$restore_env" -p introspect-restore up -d`. Check logs, API health, sign-in (if enabled), preferences, timeline counts, and known notes. Revisit a known title/source through Live if validating the UI; use the notes API when playback is unavailable.
+4. Start it with `docker compose --env-file "$restore_env" -p introspect-restore up -d`. Check logs, API health, sign-in (if enabled), preferences, timeline counts, and known notes. Revisit a known title/source through Live if validating the UI; [inspect restored notes through the API](#inspect-restored-notes-without-playback) when playback is unavailable.
 5. Record the result before considering the backup verified. For production recovery, stop access/writers, preserve the current data separately, and restore into an empty replacement volume using the same sequence and matching application revision. Recheck the public URL, credentials, and data before reopening access.
 
 Starting a newer revision may migrate the restored database. Preserve an untouched backup first. There is no supported down-migration command; rolling back code alone does not undo schema or data changes. A successful health request alone is not evidence that notes, authentication, or a recovery succeeded.
+
+### Inspect restored notes without playback
+
+Use the separate restore deployment from the steps above, with its original authentication mode. When accounts are enabled, sign in through the app as the owner of the notes; Local viewer and each account have separate collections. Open **Library** so the browser stays on a page that does not subscribe to playback. Startup and sign-in can write to the restored copy, so keep the original backup untouched.
+
+In that page's browser developer console, run the following against the standard same-origin deployment. Requests use the existing app session; no Jellyfin key or copied session token is needed.
+
+```javascript
+var restoredMediaResponse = await fetch("/api/media", {
+  credentials: "same-origin",
+});
+if (!restoredMediaResponse.ok) {
+  throw new Error(`Media request failed: ${restoredMediaResponse.status}`);
+}
+var restoredMedia = (await restoredMediaResponse.json()).items;
+console.table(
+  restoredMedia.map(
+    ({ id, title, mediaSourceId, editionLabel, noteCount }) => ({
+      id,
+      title,
+      mediaSourceId,
+      editionLabel,
+      noteCount,
+    }),
+  ),
+);
+```
+
+Choose a known title and media source with notes. Copy its `id` (the Introspect timeline UUID, not the Jellyfin item ID) into the next snippet:
+
+```javascript
+var restoredTimelineId = "REPLACE_WITH_TIMELINE_UUID";
+var restoredNotesResponse = await fetch(
+  `/api/media/${encodeURIComponent(restoredTimelineId)}/notes`,
+  { credentials: "same-origin" },
+);
+if (!restoredNotesResponse.ok) {
+  throw new Error(`Notes request failed: ${restoredNotesResponse.status}`);
+}
+var restoredNotes = (await restoredNotesResponse.json()).notes;
+console.table(
+  restoredNotes.map(({ atSeconds, body, color }) => ({
+    atSeconds,
+    body,
+    color,
+  })),
+);
+```
+
+Compare the returned count, text, timestamps, and colors with known notes from the backup's owner and edition. Record which timeline and account were checked. The media list contains only the 100 most recently observed timelines, so its length is not a total database count. If the expected timeline is absent, use a previously recorded timeline UUID for the notes request; otherwise this check is incomplete. Do not create a replacement timeline or change pairing to make missing data appear.
+
+A `401` means the app session is missing or expired; sign in again on the restore deployment. A `404` means the UUID is absent or belongs to another profile; recheck the account, UUID, and restored database. An empty notes array is only expected for a timeline known to have no notes. This check verifies the sampled stored records; it does not establish playback synchronization or a complete restore by itself.

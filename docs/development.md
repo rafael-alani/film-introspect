@@ -76,3 +76,13 @@ Documentation review on **2026-10-13** inspected branch `main`, base revision `1
 All five documented shell blocks passed `bash -n` syntax checks. Script names and configuration references were checked against the repository; this does not mean the deployment commands were executed.
 
 No dependency reinstall, browser journey, real Jellyfin/Bazarr/OMDb connection, account-isolation exercise, Docker build, deployment, persistent upgrade, or backup/restore rehearsal was performed. The Docker CLI is present, but `docker compose version` reports that the Compose subcommand is unavailable. Deployment and recovery instructions are based on repository configuration and require validation in the target environment. The historical research date in [integrations.md](integrations.md) is preserved; upstream compatibility was not rechecked here.
+
+### Documentation maintenance follow-up — 2026-10-13
+
+This follow-up used base revision `cb855f68a6a049456e29f3a7c662e6b26bf073d4`, macOS/Darwin arm64, and Bun 1.3.14 with existing dependencies. It added same-change documentation guidance and the notes API procedure for checking an isolated restore without playback.
+
+- Reviewed the procedure against routes, contracts, ownership queries, and the Library page; walked through its authentication, timeline selection, expected results, and failure handling.
+- Executed the two documented JavaScript snippets through in-process Hono requests against fresh in-memory databases, once as Local viewer and once with an app-account session cookie. Both returned the seeded timeline, count, note text, timestamp, and color. Missing authentication returned `401`; another profile's timeline returned `404` in both modes. No server was exposed or upstream contacted.
+- Checked 88 local links/anchors across the seven repository Markdown files and all five shell blocks with `bash -n`. Repository formatting and `git diff --check` passed.
+
+These checks cover the snippets and sampled ownership behavior. They did not exercise a browser console, Docker, persistent backup/restore, or live playback, and do not supersede the earlier verification limits. Application source was unchanged; the unit suite, typecheck, and build were not rerun for this documentation-only follow-up.
