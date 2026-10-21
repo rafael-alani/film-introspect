@@ -54,8 +54,11 @@ const fixture = Bun.serve({
       });
     if (url.pathname.endsWith(`/movies/${movie.id}`))
       return Response.json({ data: { ...movie, cuts } });
-    if (url.pathname.endsWith("/movies"))
+    if (url.pathname.endsWith("/movies")) {
+      if (!url.searchParams.get("query")?.trim())
+        return new Response(null, { status: 400 });
       return Response.json({ data: [movie] });
+    }
     return new Response(null, { status: 404 });
   },
 });
@@ -108,6 +111,7 @@ try {
     await Bun.sleep(100);
   }
   assert.ok(ready, "Isolated API did not become ready");
+  assert.equal((await fetch(`${base}/api/screening/movies`)).status, 400);
   const found = await request("/screening/movies?query=fixture");
   assert.equal(found.data[0].id, movie.id);
   const detail = await request(`/screening/movies/${movie.id}`);

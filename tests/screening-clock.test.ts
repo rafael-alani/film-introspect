@@ -4,6 +4,7 @@ import {
   cueWindow,
   notePosition,
   parseScreeningTime,
+  sessionAnchor,
 } from "../apps/web/src/hooks/screening-clock";
 
 describe("screening clock and held notes", () => {
@@ -46,4 +47,21 @@ describe("screening clock and held notes", () => {
     expect(cueWindow(cues, 52).map((cue) => cue.id)).toEqual(["4", "5", "6"]);
     expect(cueWindow([], 10)).toEqual([]);
   });
+});
+
+test("a newer Jellyfin position does not add elapsed check-in time twice", () => {
+  const sample = {
+    positionSeconds: 128,
+    state: "playing" as const,
+    observedAt: "2026-10-21T12:00:00.000Z",
+  };
+  const receivedAt = 8_000;
+  const anchor = sessionAnchor(sample, receivedAt);
+  expect(clockPosition(anchor, receivedAt, null)).toBe(128);
+  expect(clockPosition(anchor, receivedAt + 3_000, null)).toBe(131);
+  const next = sessionAnchor(
+    { ...sample, positionSeconds: 130 },
+    receivedAt + 2_000,
+  );
+  expect(clockPosition(next, receivedAt + 2_000, null)).toBe(130);
 });

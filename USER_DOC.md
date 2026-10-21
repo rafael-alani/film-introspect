@@ -28,7 +28,7 @@ These are Introspect accounts, not Jellyfin accounts. Enabling authentication do
 
 ## Follow playback
 
-1. On **Live**, search for a film in Meta Egg. The empty search lists available films from its connected library.
+1. On **Live**, search for a film in Meta Egg. Search requires a title; results come from its connected library.
 2. Select the movie and the **Cut / media version** you are watching, then **Open screening**. A version's runtime helps identify it; an unlabeled file is not proof of a theatrical or director's cut. Different cuts retain separate notes and subtitle timing.
 3. Select an available **Subtitle track**. Only native text subtitles are supported. If the version has image subtitles or none, add matching SRT/VTT or a text track through the library's existing workflow. Introspect cannot OCR or create missing transcripts.
 4. Open **Sync with the screen** and choose one of the clocks below.

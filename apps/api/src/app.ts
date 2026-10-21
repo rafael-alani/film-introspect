@@ -122,12 +122,12 @@ api.use("*", async (c, next) => {
 
 api.get("/screening/movies", async (c) => {
   const query = (c.req.query("query") ?? "").trim();
-  if (query.length > 200)
+  if (!query || query.length > 200)
     return errorResponse(
       c,
       400,
       "INVALID_QUERY",
-      "Search must be at most 200 characters.",
+      "Enter a film title between 1 and 200 characters.",
     );
   return c.json(await metaEgg.movies(query));
 });

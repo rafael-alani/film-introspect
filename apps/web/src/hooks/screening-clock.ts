@@ -1,4 +1,4 @@
-import type { SubtitleCue } from "@film-introspect/contracts";
+import type { ScreeningSession, SubtitleCue } from "@film-introspect/contracts";
 
 export type ClockAnchor = { position: number; at: number; running: boolean };
 
@@ -42,4 +42,16 @@ export function notePosition(
   draftPosition: number | null,
 ): number {
   return draftPosition ?? livePosition;
+}
+
+// Jellyfin already advances its reported position; check-in time is only freshness evidence.
+export function sessionAnchor(
+  session: Pick<ScreeningSession, "positionSeconds" | "state">,
+  receivedAt: number,
+): ClockAnchor {
+  return {
+    position: session.positionSeconds,
+    at: receivedAt,
+    running: session.state === "playing",
+  };
 }

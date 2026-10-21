@@ -36,6 +36,7 @@ import {
   cueWindow,
   notePosition,
   parseScreeningTime,
+  sessionAnchor,
   type ClockAnchor,
 } from "../hooks/screening-clock";
 
@@ -150,6 +151,7 @@ export function LivePage() {
   const movies = useQuery({
     queryKey: ["screening-movies", query],
     queryFn: () => api.screeningMovies(query),
+    enabled: query.length > 0,
     retry: 1,
   });
   const movie = useQuery({
@@ -199,7 +201,11 @@ export function LivePage() {
           maxLength={200}
           leftSection={<IconSearch size={18} />}
         />
-        <Button type="submit" loading={movies.isFetching}>
+        <Button
+          type="submit"
+          loading={movies.isFetching}
+          disabled={!search.trim()}
+        >
           Search films
         </Button>
       </form>
@@ -379,7 +385,9 @@ function Screening({
     mode === "jellyfin" &&
     (!selectedSession ||
       sessions.isError ||
-      Date.now() - Date.parse(selectedSession.observedAt) > 10_000 ||
+      Date.now() - sessions.dataUpdatedAt > 10_000 ||
+      (selectedSession.state === "playing" &&
+        Date.now() - Date.parse(selectedSession.observedAt) > 30_000) ||
       Date.parse(selectedSession.observedAt) - Date.now() > 5_000);
   const canNote =
     !!mediaId &&
@@ -391,20 +399,7 @@ function Screening({
   }, []);
   useEffect(() => {
     if (mode !== "jellyfin" || !selectedSession) return;
-    const age = Math.max(
-      0,
-      Math.min(
-        10,
-        (Date.now() - Date.parse(selectedSession.observedAt)) / 1000,
-      ),
-    );
-    setAnchor({
-      position:
-        selectedSession.positionSeconds +
-        (selectedSession.state === "playing" ? age : 0),
-      at: performance.now(),
-      running: selectedSession.state === "playing",
-    });
+    setAnchor(sessionAnchor(selectedSession, performance.now()));
     setNow(performance.now());
   }, [
     mode,
