@@ -31,6 +31,10 @@ export async function metaEggRequest<T>(
       "Meta Egg is unreachable. Check its connection and try again.",
     );
   }
+  if (response.status === 503)
+    throw new MetaEggError(
+      "Meta Egg's film library is not connected yet. Ask the operator to configure its library connection.",
+    );
   if (!response.ok)
     throw new MetaEggError(
       `Meta Egg could not complete this request (${response.status}). Check the selected cut and its text subtitles, then try again.`,

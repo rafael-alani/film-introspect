@@ -191,6 +191,10 @@ try {
   unavailable = true;
   const offline = await fetch(`${base}/api/screening/movies?query=fixture`);
   assert.equal(offline.status, 502);
+  assert.match(
+    (await offline.json()).error.message,
+    /film library is not connected yet/,
+  );
   unavailable = false;
   console.info(
     "PASS: Meta Egg search, cuts, transcript, timeline reuse, cut isolation, note timestamp, invalid timeline, wrong-cut rejection, and unavailable upstream checks.",
