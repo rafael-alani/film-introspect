@@ -31,6 +31,7 @@ Open [localhost:5173](http://localhost:5173). For real playback, start a title i
 | [Development](docs/development.md)           | Configure local development, run checks, and inspect verification limits      |
 | [Architecture](docs/architecture.md)         | Find components, data ownership, and integration boundaries                   |
 | [Operations](docs/operations.md)             | Configure services, deploy Compose, diagnose problems, and back up or restore |
+| [Private staging](docs/staging.md) | Review a candidate before promotion to main |
 | [Integration research](docs/integrations.md) | Read the historical protocol rationale and primary sources                    |
 | [Agent guidance](AGENTS.md)                  | Find task-specific reading and essential repository constraints               |
 
