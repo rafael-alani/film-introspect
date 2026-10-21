@@ -101,7 +101,7 @@ Reviewed all seven Markdown guides and `.env.example` against `main` at `edc67fe
 
 ## Screening MVP checks
 
-Run `bun run scripts/screening-smoke.ts` to start an ephemeral Meta Egg fixture and an Introspect API with an in-memory database. It checks the real HTTP path for search, cuts, transcripts, timeline reuse, cut-isolated notes, captured timestamps and invalid timeline requests. It does not read or mutate the configured application database, and it clears external integration settings for the child API.
+Run `bun run scripts/screening-smoke.ts` to start an ephemeral Meta Egg fixture and an Introspect API with an in-memory database. It checks the real HTTP path for search, cuts, transcripts, timeline reuse, cut-isolated notes, captured timestamps and invalid timeline requests. Add `--slow` to verify a 16-second upstream response can complete beyond the former 15-second proxy deadline. It does not read or mutate the configured application database, and it clears external integration settings for the child API.
 
 For a browser walkthrough, run `bun run scripts/screening-smoke.ts --serve` (API port 3001), then `bun run --cwd apps/web dev`. Search the clearly labeled **Screening timing fixture**, choose a cut, sync to `0:00`, focus Quick note, wait for the film clock to advance, then save. Confirm the note retains its starting time and the subtitle roll catches up. This uses synthetic test data only; it is not evidence that a real movie or Jellyfin player is synchronized. Stop both processes afterward. Localhost server binding may require the execution environment's network approval.
 

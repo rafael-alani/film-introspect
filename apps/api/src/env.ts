@@ -30,6 +30,12 @@ const envSchema = z.object({
   ALLOW_SIGN_UP: booleanFromEnv.default(process.env.NODE_ENV !== "production"),
   APP_AUTH_ENABLED: booleanFromEnv.default(false),
   META_EGG_URL: optionalUrl,
+  META_EGG_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(180_000)
+    .default(65_000),
   JELLYFIN_URL: optionalUrl,
   JELLYFIN_API_KEY: optionalString,
   JELLYFIN_USER_ID: optionalString,

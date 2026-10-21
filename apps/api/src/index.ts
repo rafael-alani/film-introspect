@@ -13,6 +13,7 @@ jellyfinSync.start();
 const server = Bun.serve({
   hostname: "0.0.0.0",
   port: env.API_PORT,
+  idleTimeout: Math.ceil(env.META_EGG_TIMEOUT_MS / 1000) + 5,
   fetch: app.fetch,
 });
 

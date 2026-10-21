@@ -23,7 +23,7 @@ export async function metaEggRequest<T>(
       `${env.META_EGG_URL.replace(/\/$/, "")}/v1/screening/${path}`,
       {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(env.META_EGG_TIMEOUT_MS),
       },
     );
   } catch {

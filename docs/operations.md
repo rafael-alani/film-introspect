@@ -6,25 +6,26 @@ This guide covers the supplied single-API SQLite deployment. Commands assume the
 
 Copy [`.env.example`](../.env.example) to `.env` on first setup and edit it. Do not overwrite an existing configuration. API validation lives in [`env.ts`](../apps/api/src/env.ts); Compose maps the variables in [`compose.yaml`](../compose.yaml). Restart a local API or recreate its Compose container after changing settings.
 
-| Variable                           | Default / meaning                                                                                                                                     |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                         | `development` locally; Compose forces `production`                                                                                                    |
-| `API_PORT`                         | `3001`; Compose fixes the internal port to 3001                                                                                                       |
-| `DATABASE_PATH`                    | `./data/introspect.db` relative to API working directory; Compose fixes it to `/data/introspect.db`                                                   |
-| `WEB_ORIGIN`                       | `http://localhost:5173` locally; exact allowed browser origin; Compose uses `PUBLIC_URL`                                                              |
-| `BETTER_AUTH_URL`                  | `http://localhost:5173` locally; public app URL used by auth; Compose uses `PUBLIC_URL`                                                               |
-| `BETTER_AUTH_SECRET`               | At least 32 characters; a development default exists, but production requires an explicit non-default value, even when app login is disabled          |
-| `APP_AUTH_ENABLED`                 | `false`; uses shared Local viewer when disabled                                                                                                       |
-| `ALLOW_SIGN_UP`                    | Defaults to true outside production, false in production; `.env.example` explicitly sets true                                                         |
-| `META_EGG_URL`                     | Private Meta Egg base URL reachable by the API. Required for Live search, cuts, transcripts and optional session sync. No default or homelab address. |
-| `JELLYFIN_URL`, `JELLYFIN_API_KEY` | Optional legacy observer; the screening workflow obtains playback through Meta Egg                                                                    |
-| `JELLYFIN_USER_ID`                 | Optional user scope for ordinary session selection; see [trust limits](architecture.md#authentication-and-trust)                                      |
-| `JELLYFIN_POLL_INTERVAL_MS`        | `10000`; accepted range 2000–60000                                                                                                                    |
-| `BAZARR_URL`, `BAZARR_API_KEY`     | Optional pair for status checks; URL may include `/api`                                                                                               |
-| `OMDB_API_KEY`                     | Optional key for explicit runtime lookup                                                                                                              |
-| `DEMO_MODE`                        | `false`; simulates playback/subtitles when enabled; note/settings writes still persist                                                                |
-| `PUBLIC_URL`                       | Compose only: defaults to `http://localhost:8080`; sets API origin/auth URL                                                                           |
-| `WEB_PORT`                         | Compose only: host port `8080` by default                                                                                                             |
+| Variable                           | Default / meaning                                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                         | `development` locally; Compose forces `production`                                                                                                                  |
+| `API_PORT`                         | `3001`; Compose fixes the internal port to 3001                                                                                                                     |
+| `DATABASE_PATH`                    | `./data/introspect.db` relative to API working directory; Compose fixes it to `/data/introspect.db`                                                                 |
+| `WEB_ORIGIN`                       | `http://localhost:5173` locally; exact allowed browser origin; Compose uses `PUBLIC_URL`                                                                            |
+| `BETTER_AUTH_URL`                  | `http://localhost:5173` locally; public app URL used by auth; Compose uses `PUBLIC_URL`                                                                             |
+| `BETTER_AUTH_SECRET`               | At least 32 characters; a development default exists, but production requires an explicit non-default value, even when app login is disabled                        |
+| `APP_AUTH_ENABLED`                 | `false`; uses shared Local viewer when disabled                                                                                                                     |
+| `ALLOW_SIGN_UP`                    | Defaults to true outside production, false in production; `.env.example` explicitly sets true                                                                       |
+| `META_EGG_TIMEOUT_MS`              | `65000` ms; range 1000–180000. Allow Meta Egg's metadata lookup plus subtitle extraction (two upstream requests). The API HTTP idle timeout is five seconds longer. |
+| `META_EGG_URL`                     | Private Meta Egg base URL reachable by the API. Required for Live search, cuts, transcripts and optional session sync. No default or homelab address.               |
+| `JELLYFIN_URL`, `JELLYFIN_API_KEY` | Optional legacy observer; the screening workflow obtains playback through Meta Egg                                                                                  |
+| `JELLYFIN_USER_ID`                 | Optional user scope for ordinary session selection; see [trust limits](architecture.md#authentication-and-trust)                                                    |
+| `JELLYFIN_POLL_INTERVAL_MS`        | `10000`; accepted range 2000–60000                                                                                                                                  |
+| `BAZARR_URL`, `BAZARR_API_KEY`     | Optional pair for status checks; URL may include `/api`                                                                                                             |
+| `OMDB_API_KEY`                     | Optional key for explicit runtime lookup                                                                                                                            |
+| `DEMO_MODE`                        | `false`; simulates playback/subtitles when enabled; note/settings writes still persist                                                                              |
+| `PUBLIC_URL`                       | Compose only: defaults to `http://localhost:8080`; sets API origin/auth URL                                                                                         |
+| `WEB_PORT`                         | Compose only: host port `8080` by default                                                                                                                           |
 
 Boolean true values accepted by the API are `1`, `true`, `yes`, and `on` (case insensitive); other strings are false. Prefer explicit `true`/`false` in `.env`. The optional frontend `VITE_API_URL` setting is covered in [development](development.md#local-setup).
 

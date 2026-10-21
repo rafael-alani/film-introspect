@@ -31,7 +31,8 @@ let unavailable = false;
 const fixture = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
-  fetch(request) {
+  idleTimeout: 70,
+  async fetch(request) {
     const url = new URL(request.url);
     if (unavailable) return new Response(null, { status: 503 });
     if (url.pathname.endsWith("/sessions")) return Response.json({ data: [] });
@@ -55,6 +56,8 @@ const fixture = Bun.serve({
     if (url.pathname.endsWith(`/movies/${movie.id}`))
       return Response.json({ data: { ...movie, cuts } });
     if (url.pathname.endsWith("/movies")) {
+      if (url.searchParams.get("query") === "slow-fixture")
+        await Bun.sleep(16_000);
       if (!url.searchParams.get("query")?.trim())
         return new Response(null, { status: 400 });
       return Response.json({ data: [movie] });
@@ -74,6 +77,7 @@ const child = Bun.spawn([process.execPath, "src/index.ts"], {
     APP_AUTH_ENABLED: "false",
     ALLOW_SIGN_UP: "false",
     DEMO_MODE: "false",
+    META_EGG_TIMEOUT_MS: "65000",
     META_EGG_URL: `http://127.0.0.1:${fixture.port}`,
     JELLYFIN_URL: "",
     JELLYFIN_API_KEY: "",
@@ -114,6 +118,13 @@ try {
   assert.equal((await fetch(`${base}/api/screening/movies`)).status, 400);
   const found = await request("/screening/movies?query=fixture");
   assert.equal(found.data[0].id, movie.id);
+  if (process.argv.includes("--slow")) {
+    const delayed = await request("/screening/movies?query=slow-fixture");
+    assert.equal(delayed.data[0].id, movie.id);
+    console.info(
+      "PASS: a 16-second Meta Egg response completes beyond the former 15-second deadline.",
+    );
+  }
   const detail = await request(`/screening/movies/${movie.id}`);
   assert.equal(detail.data.cuts.length, 2);
   const transcript = await request(
