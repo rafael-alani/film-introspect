@@ -1,0 +1,45 @@
+import type { SubtitleCue } from "@film-introspect/contracts";
+
+export type ClockAnchor = { position: number; at: number; running: boolean };
+
+export function clockPosition(
+  anchor: ClockAnchor,
+  now: number,
+  runtime: number | null,
+): number {
+  const position =
+    anchor.position +
+    (anchor.running ? Math.max(0, now - anchor.at) / 1000 : 0);
+  return Math.max(0, runtime == null ? position : Math.min(position, runtime));
+}
+
+export function parseScreeningTime(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^\d+(?::[0-5]\d){0,2}(?:\.\d+)?$/.test(trimmed)) return null;
+  const seconds = trimmed
+    .split(":")
+    .reduce((sum, part) => sum * 60 + Number(part), 0);
+  return Number.isFinite(seconds) && seconds <= 86400 ? seconds : null;
+}
+
+export function cueWindow(
+  cues: SubtitleCue[],
+  position: number,
+): SubtitleCue[] {
+  if (!cues.length) return [];
+  let active = cues.findIndex(
+    (cue) => cue.startSeconds <= position && cue.endSeconds >= position,
+  );
+  if (active < 0) {
+    active = cues.findIndex((cue) => cue.startSeconds > position);
+    if (active < 0) active = cues.length - 1;
+  }
+  return cues.slice(Math.max(0, active - 1), Math.min(cues.length, active + 2));
+}
+
+export function notePosition(
+  livePosition: number,
+  draftPosition: number | null,
+): number {
+  return draftPosition ?? livePosition;
+}

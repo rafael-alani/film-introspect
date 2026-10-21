@@ -6,8 +6,11 @@ Push a commit to this branch to deploy it; the staging guest checks roughly
 every two minutes, then builds the API and frontend from that exact commit.
 `main` is not deployed by this environment.
 
-The initial environment uses `DEMO_MODE=true` and the application's local
-single-user profile. Production Jellyfin/Bazarr credentials are not supplied.
+The screening candidate requires `META_EGG_URL` to point to the private Meta Egg
+screening API, `DEMO_MODE=false`, and the application's local single-user profile
+or configured accounts. Jellyfin access belongs to Meta Egg's explicitly scoped
+integration; Film Introspect needs no direct Jellyfin/Bazarr credentials or media
+mounts for this workflow. The old demo-only deployment cannot test this candidate.
 SQLite notes/settings persist across successful branch deployments.
 
 The homelab repository owns the reviewed Compose definition, scoped settings,

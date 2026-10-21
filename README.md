@@ -1,6 +1,6 @@
 # Introspect
 
-Introspect is a mobile-first second-screen journal for movies and shows. It follows a Jellyfin playback session, mirrors play/pause/seek state, displays nearby subtitle lines, and saves notes at the current playhead.
+Introspect is a dim second-screen journal for films. Search Meta Egg, choose the matching cut and transcript, then anchor the subtitle clock to the film or follow a permitted Jellyfin device through Meta Egg. Beginning a note holds the dialogue and timestamp while the film keeps moving; saving returns immediately to live subtitles.
 
 This Bun workspace contains a React/Vite web app, a Hono API, shared Zod contracts, and SQLite storage. See the [user guide](USER_DOC.md#capability-index) for supported capabilities, workflows, and restrictions.
 
@@ -13,13 +13,13 @@ cp .env.example .env
 bun install --frozen-lockfile
 ```
 
-Edit `.env` before starting. Set `JELLYFIN_URL` to an address reachable from the API and supply `JELLYFIN_API_KEY`. Set `JELLYFIN_USER_ID` to scope normal session selection. To preview without Jellyfin, use `DEMO_MODE=true` and leave `JELLYFIN_USER_ID` empty. Reuse an existing `.env` instead of overwriting it.
+Edit `.env` before starting. Set `META_EGG_URL` to your private Meta Egg API, configured with the library and scoped Jellyfin user. The Live workflow needs Meta Egg's `/v1/screening` API. Direct Jellyfin, Bazarr and OMDb settings are optional legacy integrations; they are not required for screening notes. Reuse an existing `.env` instead of overwriting it.
 
 ```bash
 bun dev
 ```
 
-Open [localhost:5173](http://localhost:5173). For real playback, start a title in Jellyfin and choose the device in **Settings → Session to follow**. The API listens on port 3001; Vite proxies `/api` to it. API startup applies migrations automatically.
+Open [localhost:5173](http://localhost:5173). Search for a film on **Live**, choose its cut, then select **Open screening** and **Sync with the screen**. The API listens on port 3001; Vite proxies `/api` to it. API startup applies migrations automatically.
 
 `APP_AUTH_ENABLED=false` is the default: everyone who can reach the app shares the **Local viewer** profile and its notes. Enable accounts for separate collections; Introspect credentials are separate from Jellyfin credentials. See [authentication and access](docs/operations.md#authentication-and-access) before exposing the app beyond a trusted network.
 
@@ -31,8 +31,8 @@ Open [localhost:5173](http://localhost:5173). For real playback, start a title i
 | [Development](docs/development.md)           | Configure local development, run checks, and inspect verification limits      |
 | [Architecture](docs/architecture.md)         | Find components, data ownership, and integration boundaries                   |
 | [Operations](docs/operations.md)             | Configure services, deploy Compose, diagnose problems, and back up or restore |
-| [Private staging](docs/staging.md) | Review a candidate before promotion to main |
+| [Private staging](docs/staging.md)           | Review a candidate before promotion to main                                   |
 | [Integration research](docs/integrations.md) | Read the historical protocol rationale and primary sources                    |
 | [Agent guidance](AGENTS.md)                  | Find task-specific reading and essential repository constraints               |
 
-The guides describe the `main` implementation, not a verified deployed release. [Verification](docs/development.md#verification) records the inspected revision and checks actually run.
+The guides describe this candidate implementation. Staging deployment and real-screen synchronization require separate verification. [Verification](docs/development.md#verification) records the inspected revision and checks actually run.

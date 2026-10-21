@@ -6,30 +6,39 @@ This guide covers the supplied single-API SQLite deployment. Commands assume the
 
 Copy [`.env.example`](../.env.example) to `.env` on first setup and edit it. Do not overwrite an existing configuration. API validation lives in [`env.ts`](../apps/api/src/env.ts); Compose maps the variables in [`compose.yaml`](../compose.yaml). Restart a local API or recreate its Compose container after changing settings.
 
-| Variable                           | Default / meaning                                                                                                                            |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                         | `development` locally; Compose forces `production`                                                                                           |
-| `API_PORT`                         | `3001`; Compose fixes the internal port to 3001                                                                                              |
-| `DATABASE_PATH`                    | `./data/introspect.db` relative to API working directory; Compose fixes it to `/data/introspect.db`                                          |
-| `WEB_ORIGIN`                       | `http://localhost:5173` locally; exact allowed browser origin; Compose uses `PUBLIC_URL`                                                     |
-| `BETTER_AUTH_URL`                  | `http://localhost:5173` locally; public app URL used by auth; Compose uses `PUBLIC_URL`                                                      |
-| `BETTER_AUTH_SECRET`               | At least 32 characters; a development default exists, but production requires an explicit non-default value, even when app login is disabled |
-| `APP_AUTH_ENABLED`                 | `false`; uses shared Local viewer when disabled                                                                                              |
-| `ALLOW_SIGN_UP`                    | Defaults to true outside production, false in production; `.env.example` explicitly sets true                                                |
-| `JELLYFIN_URL`, `JELLYFIN_API_KEY` | Both required for real playback; blanks mean unconfigured                                                                                    |
-| `JELLYFIN_USER_ID`                 | Optional user scope for ordinary session selection; see [trust limits](architecture.md#authentication-and-trust)                             |
-| `JELLYFIN_POLL_INTERVAL_MS`        | `10000`; accepted range 2000–60000                                                                                                           |
-| `BAZARR_URL`, `BAZARR_API_KEY`     | Optional pair for status checks; URL may include `/api`                                                                                      |
-| `OMDB_API_KEY`                     | Optional key for explicit runtime lookup                                                                                                     |
-| `DEMO_MODE`                        | `false`; simulates playback/subtitles when enabled; note/settings writes still persist                                                       |
-| `PUBLIC_URL`                       | Compose only: defaults to `http://localhost:8080`; sets API origin/auth URL                                                                  |
-| `WEB_PORT`                         | Compose only: host port `8080` by default                                                                                                    |
+| Variable                           | Default / meaning                                                                                                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                         | `development` locally; Compose forces `production`                                                                                                    |
+| `API_PORT`                         | `3001`; Compose fixes the internal port to 3001                                                                                                       |
+| `DATABASE_PATH`                    | `./data/introspect.db` relative to API working directory; Compose fixes it to `/data/introspect.db`                                                   |
+| `WEB_ORIGIN`                       | `http://localhost:5173` locally; exact allowed browser origin; Compose uses `PUBLIC_URL`                                                              |
+| `BETTER_AUTH_URL`                  | `http://localhost:5173` locally; public app URL used by auth; Compose uses `PUBLIC_URL`                                                               |
+| `BETTER_AUTH_SECRET`               | At least 32 characters; a development default exists, but production requires an explicit non-default value, even when app login is disabled          |
+| `APP_AUTH_ENABLED`                 | `false`; uses shared Local viewer when disabled                                                                                                       |
+| `ALLOW_SIGN_UP`                    | Defaults to true outside production, false in production; `.env.example` explicitly sets true                                                         |
+| `META_EGG_URL`                     | Private Meta Egg base URL reachable by the API. Required for Live search, cuts, transcripts and optional session sync. No default or homelab address. |
+| `JELLYFIN_URL`, `JELLYFIN_API_KEY` | Optional legacy observer; the screening workflow obtains playback through Meta Egg                                                                    |
+| `JELLYFIN_USER_ID`                 | Optional user scope for ordinary session selection; see [trust limits](architecture.md#authentication-and-trust)                                      |
+| `JELLYFIN_POLL_INTERVAL_MS`        | `10000`; accepted range 2000–60000                                                                                                                    |
+| `BAZARR_URL`, `BAZARR_API_KEY`     | Optional pair for status checks; URL may include `/api`                                                                                               |
+| `OMDB_API_KEY`                     | Optional key for explicit runtime lookup                                                                                                              |
+| `DEMO_MODE`                        | `false`; simulates playback/subtitles when enabled; note/settings writes still persist                                                                |
+| `PUBLIC_URL`                       | Compose only: defaults to `http://localhost:8080`; sets API origin/auth URL                                                                           |
+| `WEB_PORT`                         | Compose only: host port `8080` by default                                                                                                             |
 
 Boolean true values accepted by the API are `1`, `true`, `yes`, and `on` (case insensitive); other strings are false. Prefer explicit `true`/`false` in `.env`. The optional frontend `VITE_API_URL` setting is covered in [development](development.md#local-setup).
 
 Jellyfin's URL must be reachable from the API runtime. `localhost` inside its container refers to that container; the supplied Compose file does not create Jellyfin or Bazarr services. Use a reachable server address or connect the containers to your existing network. Create a Jellyfin dashboard API key and keep it in the backend environment.
 
 Configure Bazarr's Jellyfin integration and metadata refresh in Bazarr itself. Introspect only checks Bazarr's status and receives subtitles through Jellyfin; it does not replace Bazarr's Sonarr/Radarr setup. [Integration research](integrations.md#bazarr) explains this boundary.
+
+## Meta Egg screening contract
+
+Configure `META_EGG_URL` with a private, reachable Meta Egg service exposing `/v1/screening/movies`, movie detail, cut-specific transcripts and scoped sessions. Introspect needs no media filesystem mount and no Jellyfin credential for this path. Meta Egg's deployment owns its library endpoint, read credentials and permitted user. Do not expose Meta Egg's unauthenticated API publicly.
+
+The Compose API keeps notes in `/data/introspect.db` on `introspect_data`; the web service exposes port 80 through `WEB_PORT`, and `/api/health` is the liveness probe. Deployment assignments may replace the named volume with a scoped host bind mount. API health is not evidence that Meta Egg, a transcript or a screening is usable.
+
+A missing or unavailable Meta Egg connection is shown in Live. Bitmap-only subtitles need a text track; no OCR, download job, fake demo transcript, or alternate cut is used as fallback. Keep server and client clocks synchronized for automatic session freshness checks. Scope the Meta Egg user before testing automatic playback.
 
 ## Authentication and access
 
@@ -58,20 +67,20 @@ docker compose logs --tail=100 api web
 curl --fail http://localhost:8080/api/health
 ```
 
-Use your configured port for the health request. A successful response has `ok: true`; it proves API liveness, not upstream availability. Open the app and use **Settings → Check services**, then follow [the user playback workflow](../USER_DOC.md#follow-playback).
+Use your configured port for the health request. A successful response has `ok: true`; it proves API liveness, not upstream availability. Open **Live**, search a real film, load its exact cut and transcript, then follow [the user playback workflow](../USER_DOC.md#follow-playback).
 
 Compose publishes only the web container's HTTP port. For a reverse proxy, terminate TLS there and forward requests to the web container; allow long-lived SSE responses without buffering or caching. The included [Nginx config](../apps/web/nginx.conf) already disables buffering/cache on `/api/` and uses a one-hour read timeout. Keep the API and upstream service access on your private network.
 
 The `introspect_data` named volume holds `/data`. Its actual Docker name is project-prefixed, so preserve the Compose project identity when restarting/updating. A new checkout directory or different `-p` value can select a fresh empty volume. `docker compose down` retains named volumes; `docker compose down -v` deletes them and the journal.
 
-Before an update, record the application revision (`git rev-parse HEAD`), back up the data/configuration, then rebuild with `docker compose up -d --build`. Startup applies migrations automatically. The Dockerfiles currently install dependencies without copying `bun.lock`; rebuilding a revision can resolve different versions of dependencies declared as `latest`. Retain known-working images alongside a backup when reproducible rollback matters.
+Before an update, record the application revision (`git rev-parse HEAD`), back up the data/configuration, then rebuild with `docker compose up -d --build`. Startup applies migrations automatically. Dockerfiles install with the checked-in `bun.lock` and `--frozen-lockfile`, including Bun workspace links in the API image. Retain known-working images alongside a backup when reproducible rollback matters.
 
 ## Diagnostics
 
 | Symptom                                   | Check and recovery                                                                                                                                                                              |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API fails at startup                      | Read API logs for environment validation, secret length, migrations, or data-directory permissions. Confirm the configured database path.                                                       |
-| Web returns 502 or app cannot load config | Check API startup and Nginx connectivity to `api:3001`; Compose startup ordering is not a readiness probe. Locally, verify the Vite proxy target.                                               |
+| Web returns 502 or app cannot load config | Check API startup and Nginx connectivity to `api:3001`; Compose waits for the API healthcheck; inspect an unhealthy API first. Locally, verify the Vite proxy target.                           |
 | Sign-in or sign-up fails                  | Confirm the exact public origin/auth URL, HTTPS/cookies, and registration setting. Reload after changing auth mode; the browser caches app config.                                              |
 | Jellyfin says Not set or Unavailable      | Check both URL/key, API-to-Jellyfin network reachability, and the status message/logs. Recreate the API after environment changes.                                                              |
 | No sessions or Live stays idle            | Start playback on the selected device, refresh the session list, and verify user/device pairing and `JELLYFIN_USER_ID`. An idle pinned device will not fall back to another device.             |

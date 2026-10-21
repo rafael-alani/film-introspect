@@ -13,6 +13,7 @@ services:
       ALLOW_SIGN_UP: ${ALLOW_SIGN_UP:-false}
       APP_AUTH_ENABLED: ${APP_AUTH_ENABLED:-false}
       WEB_ORIGIN: ${PUBLIC_URL:-http://localhost:8080}
+      META_EGG_URL: ${META_EGG_URL:-}
       JELLYFIN_URL: ${JELLYFIN_URL:-}
       JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
       JELLYFIN_USER_ID: ${JELLYFIN_USER_ID:-}
@@ -21,6 +22,18 @@ services:
       BAZARR_API_KEY: ${BAZARR_API_KEY:-}
       OMDB_API_KEY: ${OMDB_API_KEY:-}
       DEMO_MODE: ${DEMO_MODE:-false}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://localhost:3001/api/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
     volumes:
       - introspect_data:/data
 
@@ -30,7 +43,8 @@ services:
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "${WEB_PORT:-8080}:80"
 

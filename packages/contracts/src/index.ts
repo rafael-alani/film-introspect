@@ -261,3 +261,68 @@ export function formatTimestamp(totalSeconds: number): string {
     ? `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
     : `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
+
+// Meta Egg's screening API keeps every transcript attached to a concrete cut.
+export const screeningMovieSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  year: z.number().int().nullable(),
+  overview: z.string().nullable(),
+  runtimeSeconds: z.number().nonnegative().nullable(),
+});
+export const screeningTrackSchema = z.object({
+  id: z.string(),
+  index: z.number().int().nonnegative(),
+  label: z.string(),
+  language: z.string().nullable(),
+  codec: z.string().nullable(),
+  available: z.boolean(),
+});
+export const screeningCutSchema = z.object({
+  id: z.string().min(1),
+  label: z.string(),
+  runtimeSeconds: z.number().nonnegative().nullable(),
+  precision: z.literal("media_source"),
+  subtitles: z.array(screeningTrackSchema),
+});
+export const screeningMoviesSchema = z.object({
+  data: z.array(screeningMovieSchema),
+});
+export const screeningMovieDetailSchema = z.object({
+  data: screeningMovieSchema.extend({ cuts: z.array(screeningCutSchema) }),
+});
+export const screeningTranscriptSchema = z.object({
+  data: z.object({
+    itemId: z.string(),
+    cutId: z.string(),
+    trackId: z.string(),
+    language: z.string().nullable(),
+    source: z.literal("jellyfin"),
+    precision: z.literal("media_source"),
+    cues: z.array(
+      subtitleCueSchema.refine((cue) => cue.endSeconds >= cue.startSeconds),
+    ),
+  }),
+});
+export const screeningSessionsSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      itemId: z.string(),
+      cutId: z.string().nullable(),
+      deviceName: z.string(),
+      state: z.enum(["playing", "paused"]),
+      positionSeconds: z.number().nonnegative(),
+      observedAt: isoDateSchema,
+    }),
+  ),
+});
+export const screeningSelectionSchema = z.object({
+  itemId: z.string().min(1).max(200),
+  cutId: z.string().min(1).max(200),
+});
+export type ScreeningMovie = z.infer<typeof screeningMovieSchema>;
+export type ScreeningCut = z.infer<typeof screeningCutSchema>;
+export type ScreeningSession = z.infer<
+  typeof screeningSessionsSchema
+>["data"][number];

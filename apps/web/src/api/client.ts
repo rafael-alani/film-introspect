@@ -1,4 +1,8 @@
 import {
+  screeningMoviesSchema,
+  screeningMovieDetailSchema,
+  screeningTranscriptSchema,
+  screeningSessionsSchema,
   appConfigSchema,
   apiErrorSchema,
   connectionsResponseSchema,
@@ -137,6 +141,31 @@ function body(value: unknown): string {
 }
 
 export const api = {
+  screeningMovies: (query: string) =>
+    request(
+      `/api/screening/movies?query=${encodeURIComponent(query)}`,
+      screeningMoviesSchema,
+    ),
+  screeningMovie: (id: string) =>
+    request(
+      `/api/screening/movies/${encodeURIComponent(id)}`,
+      screeningMovieDetailSchema,
+    ),
+  screeningTranscript: (item: string, cut: string, index: number) =>
+    request(
+      `/api/screening/movies/${encodeURIComponent(item)}/cuts/${encodeURIComponent(cut)}/subtitles/${index}`,
+      screeningTranscriptSchema,
+    ),
+  screeningSessions: (itemId: string) =>
+    request(
+      `/api/screening/sessions?itemId=${encodeURIComponent(itemId)}`,
+      screeningSessionsSchema,
+    ),
+  screeningTimeline: (itemId: string, cutId: string) =>
+    request("/api/screening/timeline", mediaSchema, {
+      method: "POST",
+      body: body({ itemId, cutId }),
+    }),
   config: (): Promise<AppConfig> => request("/api/config", appConfigSchema),
   playback: (): Promise<PlaybackSnapshot> =>
     request("/api/playback", playbackSnapshotSchema),

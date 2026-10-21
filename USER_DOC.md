@@ -1,16 +1,16 @@
 # Using Introspect
 
-This guide describes the UI implemented in this repository. It is based on code inspection; live Jellyfin journeys have not been reverified in this documentation pass. See [verification](docs/development.md#verification).
+This guide describes the candidate screening MVP. Actual cinema alignment and permitted Jellyfin playback still need live verification. See [verification](docs/development.md#verification).
 
 ## Capability index
 
 | Goal                                                | Entrypoint                                                    |
 | --------------------------------------------------- | ------------------------------------------------------------- |
 | Use a shared local profile or separate accounts     | [Access your journal](#access-your-journal)                   |
-| Follow a Jellyfin device and its playback position  | [Follow playback](#follow-playback)                           |
+| Find a film/cut and synchronize its subtitles       | [Follow playback](#follow-playback)                           |
 | Read dialogue near the playhead                     | [Read subtitles](#read-subtitles)                             |
 | Add, edit, delete, and highlight timed notes        | [Write and revisit notes](#write-and-revisit-notes)           |
-| Search observed movies, episodes, and videos        | [Browse the library](#browse-the-library)                     |
+| Browse previously opened timelines                  | [Browse the library](#browse-the-library)                     |
 | Label an edition, override runtime, or look up OMDb | [Manage runtimes and editions](#manage-runtimes-and-editions) |
 | Set language, highlighting window, and note color   | [Set preferences](#set-preferences)                           |
 | Check Jellyfin, Bazarr, OMDb, and API status        | [Check connections](#check-connections)                       |
@@ -28,43 +28,37 @@ These are Introspect accounts, not Jellyfin accounts. Enabling authentication do
 
 ## Follow playback
 
-Prerequisites: the operator has configured Jellyfin, and you can play a title on a Jellyfin device.
+1. On **Live**, search for a film in Meta Egg. The empty search lists available films from its connected library.
+2. Select the movie and the **Cut / media version** you are watching, then **Open screening**. A version's runtime helps identify it; an unlabeled file is not proof of a theatrical or director's cut. Different cuts retain separate notes and subtitle timing.
+3. Select an available **Subtitle track**. Only native text subtitles are supported. If the version has image subtitles or none, add matching SRT/VTT or a text track through the library's existing workflow. Introspect cannot OCR or create missing transcripts.
+4. Open **Sync with the screen** and choose one of the clocks below.
 
-1. Start a movie, episode, or video in Jellyfin.
-2. Open **Settings → Session to follow**. Select the intended device; selection saves immediately.
-3. Open **Live**. The title, device, play/pause state, elapsed time, subtitles, and timeline follow that session.
-4. Pause or seek in Jellyfin when you need to hold or change the scene. Introspect's play icon and progress bar display state; they do not control the player.
+For a cinema, screening room, or any external player, use **External screen — set the clock**. Enter the film's current time as `mm:ss` or `h:mm:ss`, then tap **Sync now** at that moment. At the start, enter `0:00` and tap when the film begins. Alternatively, expand **Sync to a line of dialogue**, search for a line, and tap it when it starts on screen. Use **−0.5 s** or **+0.5 s** to correct drift. Keep the page open; reopening it requires another timing anchor.
 
-The selected Jellyfin user/device is remembered across visits. Before the first pairing, device names may be visible while the user, title, and position are hidden. With a configured Jellyfin user, playback can be selected automatically before you pin a device. Once a device is pinned, an idle device does not cause Introspect to switch to another playing device.
+For supported home playback, choose **Follow a Jellyfin device via Meta Egg** and select a device playing the exact same item and media source. Meta Egg scopes visibility to its configured Jellyfin user. A different user's player or a player without media-source identity is not eligible. Introspect observes play, pause and seek; it never controls the movie. **Sync unavailable** means timing is currently an estimate. Reconnect or switch to a manual anchor before starting another note.
 
-If the list is empty, open Jellyfin on the desired device and use **Refresh sessions**. Reload Settings if an existing list is stale. **Check services** refreshes service health, not the session list. If Live is empty, use **Choose device** or **Check again**. Persistent failures belong in [diagnostics](docs/operations.md#diagnostics).
+A matching cut and a good timing anchor are required. This MVP has no microphone/audio recognition, and network/player latency can affect the Jellyfin clock. Check the first few lines against the screen and correct the clock; frame-accurate synchronization is not claimed.
 
 ## Read subtitles
 
-The **Subtitle roll** on Live shows up to three nearby cues and highlights the active line. Introspect favors the text track selected in Jellyfin, then a preferred-language text track and other available text tracks. Change the active track in Jellyfin; Introspect has no track picker. The language preference only affects fallback selection.
+The subtitle roll shows the current line and nearby dialogue from Meta Egg's selected transcript. Change the track in the screening itself. Loading, missing tracks and upstream failures are shown explicitly, with retry for failed requests. A failed track never silently switches to another cut or to demo content.
 
-If no text stream exists, add an SRT/VTT sidecar through your existing subtitle workflow and refresh the item's metadata in Jellyfin. Bazarr can supply sidecars when configured separately; Introspect does not start subtitle searches or downloads. Bitmap PGS/VobSub/DVB tracks are not OCR'd. Notes remain usable without subtitles.
-
-After changing the language preference, reload Live to refetch cues. If a replaced sidecar still shows old text, ask the operator about the [subtitle cache](docs/operations.md#diagnostics).
+When you begin a note, the subtitle view stays at that scene while the underlying film clock continues. **Save & catch up** returns to the current line. **Return to live** discards the draft after confirmation if it contains text. No request pauses the movie.
 
 ## Write and revisit notes
 
-Prerequisite: Live shows the desired title and media source.
+1. Start/synchronize the screening clock, then tap **Quick note**. Focus captures the timestamp immediately and holds the subtitle view.
+2. Enter up to 2,000 characters. The composer shows the captured time and the film's advancing time.
+3. Select **Save & catch up**, or press Command/Ctrl+Enter. The note is saved at the time you began writing, at the displayed whole second. The subtitle view immediately rejoins the film after a successful save.
+4. A failed save retains the text and captured timestamp so you can retry. Do not close the page with a pending draft. Navigation warns before discarding text; this is not an offline journal or a draft backup.
 
-1. If you want to anchor a thought to a fixed scene, pause in Jellyfin first. The timestamp is captured when you submit, not when you begin typing.
-2. Enter up to 2,000 characters in **Quick note**, choose a color, and select **Add at …**.
-3. Look for **Note placed on the timeline.** The note appears under **Notes in this film**, ordered by timestamp. Stored timestamps are rounded to whole seconds.
-4. Use **Edit note**, change the text, and select **Save changes**; **Cancel editing** discards the edit. Use **Delete note** and confirm to remove it. There is no undo.
+Notes appear under **Notes in this cut**. Search and open the same film/cut again to read them, without needing the film to be playing. Use **Edit note** to change text, or **Delete note** and confirm to remove it; deletion has no undo. The configured default color and reading window still apply.
 
-Existing notes become prominent during the configured reading window. You can view all notes for the current timeline even outside that window. The UI edits note text only; it has no control to retime or recolor an existing note.
-
-To revisit old notes through the UI, play the same item and media source in Jellyfin and return to Live. Library cards open runtime settings, not a historical note reader. Different cuts keep separate timelines; missing notes can indicate a different account, source, or configured server address.
-
-When a save fails, read the feedback beneath the composer and check the connection. For a failed edit, reopen the note editor before retrying. If notes fail to load, use the timeline's **Try again** button. Notes are stored on the server, and drafts are not an offline journal or a backup.
+Changing films or cuts cannot move a note draft to another timeline. Timeline identity includes your Introspect profile, configured Meta Egg server, film ID, and cut ID. The older direct-Jellyfin timelines remain separate and are not automatically merged with Meta Egg timelines.
 
 ## Browse the library
 
-Open **Library** to see titles Introspect has observed for your profile. A title can appear without notes. This is not a browse/search interface for the entire Jellyfin catalog.
+Open **Library** to see titles Introspect has opened or observed for your profile. A title can appear without notes. Use **Live** to search the Meta Egg film catalog; Library is a history of your own timelines.
 
 - Search by title or series name with **Search titles**.
 - Filter with **All**, **Films**, or **Shows**; other videos appear under All.
@@ -74,6 +68,8 @@ Open **Library** to see titles Introspect has observed for your profile. A title
 The API returns at most the 100 most recently observed timelines. The UI sorts that set by note activity; counts and searches cover only those returned items. There is no pagination, journal export/import, or timeline deletion UI.
 
 ## Manage runtimes and editions
+
+These legacy Library controls affect stored timeline metadata; they do not retime Meta Egg transcripts or change the screening clock, which follows the selected cut.
 
 1. Open **Library** and select the relevant title card. The **Runtime override** dialog applies to that specific media source.
 2. Enter **Runtime in minutes** (0.1–1,440) and optionally an **Edition label** (up to 80 characters).
@@ -99,10 +95,14 @@ The reading window highlights a note from its timestamp minus **Show before** un
 
 ## Check connections
 
+These Settings checks cover legacy direct integrations. To check the screening integration, use **Live** to search a real Meta Egg film and load its selected cut/transcript.
+
 Open **Settings → Your media stack** and select **Check services**. Jellyfin and Bazarr checks contact those servers. OMDb's **Connected** badge only means a key is configured; **Look up** in the runtime dialog is the actual request. Bazarr being connected does not prove that a subtitle has been downloaded or indexed by Jellyfin.
 
 The **API status** link checks Introspect's HTTP endpoint. It does not test playback, the database contents, or upstream integrations. See [operations](docs/operations.md) for configuration and failure recovery.
 
 ## Try demo mode
 
-Ask the operator to set `DEMO_MODE=true`, restart the API, and reload the app. On a fresh profile with no conflicting Jellyfin user/device preference, Live shows a simulated **In the Mood for Love** session and synthetic subtitles. Demo notes and settings are real database writes; use a separate database for disposable experiments. [Development](docs/development.md#isolated-demo) includes an isolated startup command.
+The current Live workflow always uses Meta Egg. `DEMO_MODE=true` only affects the retained legacy playback API; it does not provide a screening catalog or replace missing integrations. For an isolated synthetic walkthrough, use `bun run scripts/screening-smoke.ts --serve` and the web dev server, as described in Development.
+
+Legacy API behavior: on a fresh profile with no conflicting Jellyfin preference, `/api/playback` and `/api/playback/subtitles` return a simulated **In the Mood for Love** session. The current Live page does not use those endpoints. API note/settings writes still persist, so use a separate database for disposable experiments. [Development](docs/development.md#isolated-demo) includes an isolated startup command.

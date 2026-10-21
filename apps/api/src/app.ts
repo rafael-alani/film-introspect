@@ -1,4 +1,5 @@
 import {
+  screeningSelectionSchema,
   appConfigSchema,
   connectionsResponseSchema,
   createNoteInputSchema,
@@ -29,6 +30,7 @@ import { env } from "./env";
 import { errorResponse } from "./http";
 import { jellyfinClient } from "./integrations/jellyfin/client";
 import { jellyfinSync } from "./integrations/jellyfin/sync";
+import { metaEgg, MetaEggError } from "./integrations/meta-egg";
 import { omdbClient } from "./integrations/omdb";
 import {
   getConnectionStatuses,
@@ -38,6 +40,7 @@ import {
   selectSession,
 } from "./services/playback";
 import {
+  resolveMedia,
   createNote,
   deleteNote,
   getSettings,
@@ -116,6 +119,84 @@ api.use("*", async (c, next) => {
   });
   await next();
 });
+
+api.get("/screening/movies", async (c) => {
+  const query = (c.req.query("query") ?? "").trim();
+  if (query.length > 200)
+    return errorResponse(
+      c,
+      400,
+      "INVALID_QUERY",
+      "Search must be at most 200 characters.",
+    );
+  return c.json(await metaEgg.movies(query));
+});
+api.get("/screening/movies/:itemId", async (c) =>
+  c.json(await metaEgg.movie(c.req.param("itemId"))),
+);
+api.get("/screening/movies/:itemId/cuts/:cutId/subtitles/:index", async (c) => {
+  const index = Number(c.req.param("index"));
+  if (!Number.isInteger(index) || index < 0)
+    return errorResponse(c, 400, "INVALID_TRACK", "Choose a subtitle track.");
+  return c.json(
+    await metaEgg.transcript(
+      c.req.param("itemId"),
+      c.req.param("cutId"),
+      index,
+    ),
+  );
+});
+api.get("/screening/sessions", async (c) => {
+  const itemId = c.req.query("itemId");
+  if (!itemId)
+    return errorResponse(c, 400, "INVALID_ITEM", "Choose a film first.");
+  return c.json(await metaEgg.sessions(itemId));
+});
+api.post(
+  "/screening/timeline",
+  zValidator("json", screeningSelectionSchema, (result, c) => {
+    if (!result.success)
+      return errorResponse(
+        c,
+        400,
+        "VALIDATION_ERROR",
+        "Choose a film and cut from Meta Egg.",
+      );
+  }),
+  async (c) => {
+    const { itemId, cutId } = c.req.valid("json");
+    const { data: movie } = await metaEgg.movie(itemId);
+    const cut = movie.cuts.find((entry) => entry.id === cutId);
+    if (!cut)
+      return errorResponse(
+        c,
+        404,
+        "CUT_NOT_FOUND",
+        "This cut is no longer available. Choose it again.",
+      );
+    const media = await resolveMedia(
+      c.get("authUser").id,
+      `meta-egg:${env.META_EGG_URL?.replace(/\/$/, "")}`,
+      {
+        id: null,
+        jellyfinItemId: movie.id,
+        mediaSourceId: cut.id,
+        editionLabel: cut.label,
+        title: movie.title,
+        contextTitle: null,
+        kind: "movie",
+        year: movie.year,
+        seasonNumber: null,
+        episodeNumber: null,
+        runtimeSeconds: cut.runtimeSeconds,
+        runtimeSource: "jellyfin",
+        providerIds: {},
+        imageUrl: null,
+      },
+    );
+    return c.json(mediaSchema.parse({ ...media, imageUrl: null }));
+  },
+);
 
 api.get("/playback", async (c) => {
   const user = c.get("authUser");
@@ -434,6 +515,8 @@ app.route("/api", api);
 
 app.notFound((c) => errorResponse(c, 404, "NOT_FOUND", "Route not found"));
 app.onError((error, c) => {
+  if (error instanceof MetaEggError)
+    return errorResponse(c, 502, "META_EGG_UNAVAILABLE", error.message);
   console.error(error);
   return errorResponse(
     c,

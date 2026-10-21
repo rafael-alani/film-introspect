@@ -6,11 +6,13 @@ Use Bun 1.3.14, matching [`package.json`](../package.json) and the Dockerfiles. 
 
 The API's `dev`, `start`, and `db:migrate` scripts explicitly load the root `.env` and run with `apps/api` as their working directory. Thus the default `DATABASE_PATH=./data/introspect.db` resolves to `apps/api/data/introspect.db`. This directory is ignored by Git. See [environment settings](operations.md#environment-settings) for the full configuration reference.
 
-Vite binds to all interfaces on port 5173 and proxies `/api` to `http://localhost:3001`. If you change `API_PORT`, update that target in [`vite.config.ts`](../apps/web/vite.config.ts) too. For access from a phone, use the development machine's reachable address and set `WEB_ORIGIN` and `BETTER_AUTH_URL` to that exact browser origin. Restart after environment changes. The placeholder hostname `jellyfin` in `.env.example` must resolve from the machine/container running the API.
+Vite binds to all interfaces on port 5173 and proxies `/api` to `http://localhost:3001`. If you change `API_PORT`, update that target in [`vite.config.ts`](../apps/web/vite.config.ts) too. For access from a phone, use the development machine's reachable address and set `WEB_ORIGIN` and `BETTER_AUTH_URL` to that exact browser origin. Restart after environment changes. `META_EGG_URL` must resolve from the machine/container running the API; `.env.example` deliberately supplies no integration hostname.
 
 Keep the same-origin proxy for the standard setup. `VITE_API_URL` is an optional frontend build-time origin override read by [`api/client.ts`](../apps/web/src/api/client.ts); it requires matching API CORS/auth configuration and is not passed as a build argument by the supplied web Dockerfile. Never put integration secrets in a `VITE_` variable.
 
 ## Isolated demo
+
+The current Live page requires the Meta Egg screening API. Use the [screening fixture](#screening-mvp-checks) for a browser walkthrough. The legacy demo below only exercises `/api/playback` and `/api/playback/subtitles`.
 
 To run the API with a disposable in-memory database and no configured upstream services, use this in one terminal from the root:
 
@@ -36,7 +38,7 @@ In another terminal, run `bun run --cwd apps/web dev` and open [localhost:5173](
 | `bun run format:check` | Check repository formatting with Prettier                 |
 | `bun run format`       | Rewrite repository formatting; use deliberately           |
 
-For code changes, run tests, typecheck, and build; check formatting for all changes. The current tests cover Jellyfin session normalization/selection and JSON/VTT subtitle parsing in [`types.test.ts`](../apps/api/src/integrations/jellyfin/types.test.ts) and [`subtitles.test.ts`](../apps/api/src/integrations/jellyfin/subtitles.test.ts). There are no existing browser, authentication, persistence, or live-integration tests. Passing the unit suite does not establish those behaviors.
+For code changes, run tests, typecheck, and build; check formatting for all changes. The current tests cover Jellyfin session normalization/selection and JSON/VTT subtitle parsing in [`types.test.ts`](../apps/api/src/integrations/jellyfin/types.test.ts) and [`subtitles.test.ts`](../apps/api/src/integrations/jellyfin/subtitles.test.ts). The screening MVP additionally has clock/held-note tests in `tests/screening-clock.test.ts` and an isolated HTTP/SQLite smoke check. There are no automated browser or live-integration tests. Passing the unit suite does not establish those behaviors.
 
 To format only documentation, pass the changed file paths to `bunx --no-install prettier --write …` rather than rewriting unrelated files. Local builds write ignored `apps/api/dist` and `apps/web/dist` directories; they do not deploy the app.
 
@@ -96,3 +98,15 @@ These checks cover the snippets and sampled ownership behavior. They did not exe
 Reviewed all seven Markdown guides and `.env.example` against `main` at `edc67fe05089817a6d7ccd992110dd60f3702111` on macOS/Darwin arm64, Bun 1.3.14, with existing dependencies. Source inspection and documentation walkthroughs covered setup, pairing, notes, subtitles, runtimes, preferences, demo, and recovery. The existing guide structure and agent maintenance rule remained sufficient.
 
 `bun run format:check`, `git diff --check`, 89 local links/anchors, and `bash -n` for five shell blocks passed. Referenced paths and scripts were checked. Capabilities, restore snippets, constraints, and historical evidence were preserved. Application code and configuration values were unchanged; runtime tests, browser journeys, deployment, restore, and upstream compatibility were not rechecked.
+
+## Screening MVP checks
+
+Run `bun run scripts/screening-smoke.ts` to start an ephemeral Meta Egg fixture and an Introspect API with an in-memory database. It checks the real HTTP path for search, cuts, transcripts, timeline reuse, cut-isolated notes, captured timestamps and invalid timeline requests. It does not read or mutate the configured application database, and it clears external integration settings for the child API.
+
+For a browser walkthrough, run `bun run scripts/screening-smoke.ts --serve` (API port 3001), then `bun run --cwd apps/web dev`. Search the clearly labeled **Screening timing fixture**, choose a cut, sync to `0:00`, focus Quick note, wait for the film clock to advance, then save. Confirm the note retains its starting time and the subtitle roll catches up. This uses synthetic test data only; it is not evidence that a real movie or Jellyfin player is synchronized. Stop both processes afterward. Localhost server binding may require the execution environment's network approval.
+
+Staging acceptance must separately exercise a real Meta Egg catalog item, matching cut, available text transcript and stored note. Automatic following also requires an active permitted Jellyfin session identifying that exact media source. No new database migration is introduced by this MVP.
+
+### Screening browser fixture — 2026-10-21
+
+A desktop browser walkthrough against the isolated synthetic fixture exercised film search, explicit cut selection, clock anchoring, focus-to-hold, continued live clock advancement, note save and subtitle catch-up. The saved timestamp uses the same whole second shown in the composer; the held cue still uses its precise fractional position. This is browser behavior evidence with test data, not a real film synchronization or Jellyfin integration check.
