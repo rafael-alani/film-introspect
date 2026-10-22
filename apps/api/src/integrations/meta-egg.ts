@@ -20,6 +20,8 @@ const sourceErrors = {
     "Meta Egg's subtitle provider has reached its download or request limit. Retry after the provider's quota resets.",
   transcript_unavailable:
     "Meta Egg could not retrieve this subtitle version. Try again shortly or choose another matching version.",
+  screening_storage_unavailable:
+    "Meta Egg could not safely read or save its private screening library. Ask the operator to check its data volume, then retry.",
 };
 const sourceErrorSchema = z.object({
   code: z.enum([
@@ -28,6 +30,7 @@ const sourceErrorSchema = z.object({
     "transcript_auth_failed",
     "transcript_quota_exceeded",
     "transcript_unavailable",
+    "screening_storage_unavailable",
   ]),
 });
 

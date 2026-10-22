@@ -312,6 +312,7 @@ export const screeningMoviesSchema = z.object({
 });
 export const screeningMovieDetailSchema = z.object({
   data: screeningMovieSchema.extend({
+    savedAt: isoDateSchema.optional(),
     cuts: z.array(screeningCutSchema),
     transcriptStatus: z
       .object({
@@ -330,6 +331,7 @@ export const screeningTranscriptSchema = z.object({
     source: screeningSourceSchema,
     precision: screeningPrecisionSchema,
     provenance: screeningProvenanceSchema.optional(),
+    savedAt: isoDateSchema.optional(),
     cues: z.array(
       subtitleCueSchema.refine((cue) => cue.endSeconds >= cue.startSeconds),
     ),

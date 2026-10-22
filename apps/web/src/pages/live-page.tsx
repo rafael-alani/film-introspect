@@ -296,6 +296,11 @@ export function LivePage() {
           )}
           {detail && !movie.isFetching && !movie.isError && (
             <Stack gap="md" mt="md">
+              {detail.savedAt && (
+                <Text size="sm" c="dimmed" role="status">
+                  Saved in Meta Egg
+                </Text>
+              )}
               {detail.transcriptStatus &&
                 detail.transcriptStatus.state !== "ready" && (
                   <Text role="status" c="dimmed">
@@ -823,6 +828,11 @@ function Screening({
               ? "declared subtitle version · verify alignment"
               : "matched to this media version"}
           </Text>
+          {transcript.data?.data.savedAt && !transcript.isError && (
+            <Text size="xs" c="dimmed" mt="sm" role="status">
+              Transcript saved in Meta Egg
+            </Text>
+          )}
           {provenance && (
             <Text size="xs" c="dimmed" mt="sm">
               {provenance.attribution}

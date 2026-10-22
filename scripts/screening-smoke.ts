@@ -7,6 +7,7 @@ const provider = process.argv.includes("--jellyfin")
     ? "discovery"
     : "catalog";
 const precision = provider === "jellyfin" ? "media_source" : "subtitle_version";
+const savedAt = "2026-10-22T12:34:56.000Z";
 const provenance = {
   sourceUrl: "https://example.invalid/fixture",
   ...(provider === "discovery"
@@ -73,6 +74,7 @@ const fixture = Bun.serve({
           source: provider,
           precision,
           provenance,
+          savedAt,
           cues: Array.from({ length: 120 }, (_, i) => ({
             id: String(i),
             startSeconds: i * 5,
@@ -85,6 +87,7 @@ const fixture = Bun.serve({
       return Response.json({
         data: {
           ...movie,
+          savedAt,
           cuts: transcriptState === "ready" ? cuts : [],
           transcriptStatus: {
             state: transcriptState,
@@ -183,6 +186,7 @@ try {
   assert.equal(detail.data.cuts[0].precision, precision);
   assert.equal(detail.data.cuts[0].editionId, "theatrical");
   assert.equal(detail.data.transcriptStatus.state, "ready");
+  assert.equal(detail.data.savedAt, savedAt);
   const transcript = await request(
     `/screening/movies/${movie.id}/cuts/theatrical/subtitles/0`,
   );
@@ -190,6 +194,7 @@ try {
   assert.equal(transcript.data.cues.length, 120);
   assert.equal(transcript.data.source, provider);
   assert.equal(transcript.data.precision, precision);
+  assert.equal(transcript.data.savedAt, savedAt);
   if (provider === "discovery") {
     assert.equal(transcript.data.provenance.termsUrl, provenance.termsUrl);
     assert.equal(transcript.data.provenance.licenseUrl, undefined);
@@ -268,6 +273,7 @@ try {
     ["transcript_auth_failed", "subtitle provider rejected its credentials"],
     ["transcript_quota_exceeded", "download or request limit"],
     ["transcript_unavailable", "could not retrieve this subtitle version"],
+    ["screening_storage_unavailable", "check its data volume, then retry"],
   ]) {
     sourceError = code!;
     const failure = await fetch(
@@ -288,7 +294,7 @@ try {
   );
   unavailable = false;
   console.info(
-    `PASS (${provider}): Meta Egg search/no-match, metadata with subtitle statuses, cuts, transcript provenance, timeline reuse, cut isolation, note timestamp, invalid timeline, wrong-cut rejection, and unavailable upstream checks.`,
+    `PASS (${provider}): Meta Egg search/no-match, metadata with subtitle statuses, cuts, transcript provenance, save acknowledgements, timeline reuse, cut isolation, note timestamp, invalid timeline, wrong-cut rejection, and safe upstream/storage errors.`,
   );
   if (serve) {
     console.info(

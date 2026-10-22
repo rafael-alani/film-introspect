@@ -70,6 +70,47 @@ describe("independent screening contracts", () => {
     });
     expect(result.data.provider).toBe("jellyfin");
   });
+  test("preserves confirmed save times and rejects invalid storage acknowledgements", () => {
+    const savedAt = "2026-10-22T12:34:56.000Z";
+    const detail = { ...movie, cuts: [cut], savedAt };
+    const transcript = {
+      itemId: movie.id,
+      cutId: cut.id,
+      trackId: "0",
+      language: "eng",
+      source: "discovery",
+      precision: "subtitle_version",
+      cues: [],
+      savedAt,
+    };
+    expect(
+      screeningMovieDetailSchema.parse({ data: detail }).data.savedAt,
+    ).toBe(savedAt);
+    expect(
+      screeningTranscriptSchema.parse({ data: transcript }).data.savedAt,
+    ).toBe(savedAt);
+    for (const invalid of ["saved", "", null, 1]) {
+      expect(
+        screeningMovieDetailSchema.safeParse({
+          data: { ...detail, savedAt: invalid },
+        }).success,
+      ).toBe(false);
+      expect(
+        screeningTranscriptSchema.safeParse({
+          data: { ...transcript, savedAt: invalid },
+        }).success,
+      ).toBe(false);
+    }
+    expect(
+      screeningMovieDetailSchema.parse({ data: { ...movie, cuts: [cut] } }).data
+        .savedAt,
+    ).toBeUndefined();
+    expect(
+      screeningTranscriptSchema.parse({
+        data: { ...transcript, savedAt: undefined },
+      }).data.savedAt,
+    ).toBeUndefined();
+  });
   test("preserves discovered metadata when subtitles cannot yet be supplied", () => {
     for (const state of ["not_configured", "not_found", "unavailable"]) {
       const result = screeningMovieDetailSchema.parse({
