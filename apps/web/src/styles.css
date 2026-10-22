@@ -1634,6 +1634,15 @@ a:focus-visible {
   letter-spacing: 0.02em;
   text-transform: none;
 }
+.screening-page .composer-footer {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.screening-page .composer-footer .mantine-Button-root {
+  flex: 1 0 auto;
+  width: auto;
+  min-height: 44px;
+}
 .screening-page textarea {
   caret-color: var(--amber-light);
 }
