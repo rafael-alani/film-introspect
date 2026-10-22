@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -152,15 +153,22 @@ export const notes = sqliteTable(
       .references(() => mediaItems.id, { onDelete: "cascade" }),
     atSeconds: integer("at_seconds").notNull(),
     body: text("body").notNull(),
-    color: text("color", { enum: ["amber", "mint", "lilac", "rose", "sky"] })
+    color: text("color", {
+      enum: ["amber", "mint", "lilac", "rose", "sky", "orange"],
+    })
       .default("amber")
       .notNull(),
+    rating: integer("rating"),
     createdAt: timestamp("created_at"),
     updatedAt: timestamp("updated_at"),
   },
   (table) => [
     index("notes_media_time_idx").on(table.mediaId, table.atSeconds),
     index("notes_user_updated_idx").on(table.userId, table.updatedAt),
+    check(
+      "notes_rating_check",
+      sql`${table.rating} IS NULL OR (typeof(${table.rating}) = 'integer' AND ${table.rating} BETWEEN 1 AND 10)`,
+    ),
   ],
 );
 

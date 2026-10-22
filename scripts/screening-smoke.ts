@@ -230,6 +230,38 @@ try {
   assert.equal(note.atSeconds, 125);
   assert.equal((await request(`/media/${first.id}/notes`)).notes.length, 1);
   assert.equal((await request(`/media/${other.id}/notes`)).notes.length, 0);
+  assert.equal(note.rating, null);
+  const ping = await request(`/media/${first.id}/notes`, "POST", {
+    atSeconds: 130,
+    body: "",
+    color: "orange",
+    rating: 9,
+  });
+  assert.equal(ping.body, "");
+  assert.equal(ping.color, "orange");
+  assert.equal(ping.rating, 9);
+  const recolored = await request(`/notes/${ping.id}`, "PATCH", {
+    color: "sky",
+  });
+  assert.equal(recolored.rating, 9);
+  const written = await request(`/notes/${ping.id}`, "PATCH", {
+    body: "Notation explained later",
+  });
+  assert.equal(written.color, "sky");
+  assert.equal(written.rating, 9);
+  assert.equal(written.atSeconds, 130);
+  const cleared = await request(`/notes/${ping.id}`, "PATCH", { rating: null });
+  assert.equal(cleared.rating, null);
+  assert.equal(cleared.body, written.body);
+  for (const rating of [0, 11, 3.5, "8"]) {
+    const invalid = await fetch(`${base}/api/notes/${ping.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rating }),
+    });
+    assert.equal(invalid.status, 400);
+  }
+  assert.equal((await request(`/media/${other.id}/notes`)).notes.length, 0);
   assert.equal(
     (
       await fetch(`${base}/api/screening/timeline`, {
@@ -294,7 +326,7 @@ try {
   );
   unavailable = false;
   console.info(
-    `PASS (${provider}): Meta Egg search/no-match, metadata with subtitle statuses, cuts, transcript provenance, save acknowledgements, timeline reuse, cut isolation, note timestamp, invalid timeline, wrong-cut rejection, and safe upstream/storage errors.`,
+    `PASS (${provider}): Meta Egg search/no-match, metadata with subtitle statuses, cuts, transcript provenance, save acknowledgements, timeline reuse, cut isolation, note timestamp, empty-text color/rating pings, partial edits, rating validation, invalid timeline, wrong-cut rejection, and safe upstream/storage errors.`,
   );
   if (serve) {
     console.info(

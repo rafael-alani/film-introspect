@@ -23,6 +23,7 @@ import {
   IconServer,
 } from "@tabler/icons-react";
 import {
+  noteColors,
   type ConnectionStatus,
   type NoteColor,
 } from "@film-introspect/contracts";
@@ -46,8 +47,6 @@ const services = [
   },
   { id: "omdb", title: "OMDb", detail: "Runtime fallback", icon: IconDatabase },
 ] as const;
-
-const colors: NoteColor[] = ["amber", "mint", "lilac", "rose", "sky"];
 
 function ConnectionCard({
   definition,
@@ -350,18 +349,18 @@ export function SettingsPage() {
                 Default note color
               </Text>
               <div className="settings-color-picker">
-                {colors.map((item) => (
+                {noteColors.map((item) => (
                   <button
-                    key={item}
+                    key={item.value}
                     type="button"
-                    className={`settings-color-option note-${item}${color === item ? " selected" : ""}`}
-                    onClick={() => setColor(item)}
-                    aria-label={`${item} note color`}
-                    aria-pressed={color === item}
+                    className={`settings-color-option note-${item.value}${color === item.value ? " selected" : ""}`}
+                    onClick={() => setColor(item.value)}
+                    aria-label={`${item.name}: ${item.label}`}
+                    aria-pressed={color === item.value}
                   >
                     <span />
-                    {item}
-                    {color === item && <IconCheck size={14} />}
+                    {item.name} · {item.label}
+                    {color === item.value && <IconCheck size={14} />}
                   </button>
                 ))}
               </div>

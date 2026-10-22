@@ -1,6 +1,6 @@
 # Introspect
 
-Introspect is a dim second-screen journal for films. Search Meta Egg, choose the matching cut and transcript, then anchor the subtitle clock to the film playing in a cinema, on a friend's screen, or in any player. Jellyfin following is an optional mode for Jellyfin-backed catalog entries. Beginning a note holds the dialogue and timestamp while the film keeps moving; saving returns immediately to live subtitles.
+Introspect is a dim second-screen journal for films. Search Meta Egg, choose the matching cut and transcript, then anchor the subtitle clock to the film playing in a cinema, on a friend's screen, or in any player. Jellyfin following is an optional mode for Jellyfin-backed catalog entries. Beginning a note holds the dialogue and timestamp while the film keeps moving; saving returns immediately to live subtitles. One-tap color and 1–10 rating pings capture individual moments, with optional text.
 
 This Bun workspace contains a React/Vite web app, a Hono API, shared Zod contracts, and SQLite storage. See the [user guide](USER_DOC.md#capability-index) for supported capabilities, workflows, and restrictions.
 

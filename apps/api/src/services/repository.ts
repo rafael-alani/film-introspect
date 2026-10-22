@@ -59,6 +59,7 @@ function noteRowToContract(row: NoteRow): Note {
     atSeconds: row.atSeconds,
     body: row.body,
     color: row.color,
+    rating: row.rating,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

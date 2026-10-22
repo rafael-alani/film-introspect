@@ -9,7 +9,7 @@ This guide describes the candidate screening MVP. It is designed for a cinema, a
 | Use a shared local profile or separate accounts     | [Access your journal](#access-your-journal)                   |
 | Find a film/cut and synchronize its subtitles       | [Follow playback](#follow-playback)                           |
 | Read dialogue near the playhead                     | [Read subtitles](#read-subtitles)                             |
-| Add, edit, delete, and highlight timed notes        | [Write and revisit notes](#write-and-revisit-notes)           |
+| Add, color-code, rate, and edit moments             | [Write and revisit notes](#write-and-revisit-notes)           |
 | Browse previously opened timelines                  | [Browse the library](#browse-the-library)                     |
 | Label an edition, override runtime, or look up OMDb | [Manage runtimes and editions](#manage-runtimes-and-editions) |
 | Set language, highlighting window, and note color   | [Set preferences](#set-preferences)                           |
@@ -45,16 +45,50 @@ A declared subtitle version identifies the timing source; it does not automatica
 
 The subtitle roll shows the current line and nearby dialogue from Meta Egg's selected transcript. Change the track in the screening itself. Loading, missing tracks and upstream failures are shown explicitly, with retry for failed requests. A failed track never silently switches to another cut or to demo content.
 
-When you begin a note, the subtitle view stays at that scene while the underlying film clock continues. **Save & catch up** returns to the current line. **Return to live** discards the draft after confirmation if it contains text. No request pauses the movie.
+When you begin a note, the subtitle view stays at that scene while the underlying film clock continues. **Save & catch up**, a color ping, or a rating ping returns to the current line after saving. **Return to live** asks before discarding text or an unsaved ping. No request pauses the movie.
 
 ## Write and revisit notes
 
-1. Start/synchronize the screening clock, then tap **Quick note**. Focus captures the timestamp immediately and holds the subtitle view.
-2. Enter up to 2,000 characters. The composer shows the captured time and the film's advancing time.
-3. Select **Save & catch up**, or press Command/Ctrl+Enter. The note is saved at the time you began writing, at the displayed whole second. The subtitle view immediately rejoins the film after a successful save.
-4. A failed save retains the text and captured timestamp so you can retry. Do not close the page with a pending draft. Navigation warns before discarding text; this is not an offline journal or a draft backup.
+1. Start/synchronize the screening clock. All six color buttons and all ten scores sit beside **Quick note**, always visible. Tap a color or score once to save that moment immediately. No text, picker, popup, scrollable option list, or second save press is required.
+2. To add words, focus **Quick note** first. Focus captures the timestamp and holds the subtitle view while the film continues. Enter up to 2,000 characters, then tap a color or score to save the draft at that captured time. **Save & catch up** or Command/Ctrl+Enter also saves text with your default color.
+3. A score is for this individual moment, not a whole-film rating. Score-only pings use your default note color. Scores are whole numbers from 1 to 10; an unrated moment has no score, rather than zero.
+4. A failed save retains the text, color, score, and captured timestamp. Use **Retry & catch up** without recapturing the time. Navigation warns before discarding text or an unsaved ping. This is not an offline journal or a draft backup.
 
-Notes appear under **Notes in this cut**. Search and open the same film/cut again to read them, without needing the film to be playing. Use **Edit note** to change text, or **Delete note** and confirm to remove it; deletion has no undo. The configured default color and reading window still apply.
+Under **Notes in this cut**, each moment shows its time, color meaning, optional text, and score. Its visible color and rating buttons save corrections with one press, preserving its timestamp and other fields. Use **Clear rating** to remove only the score, **Edit note** to add/change text (including on a textless ping), or **Delete note** and confirm to remove the moment; deletion has no undo. Failed text edits stay open for retry. Reopen the same film/cut to revisit moments without playback.
+
+The on-page **Color meanings & rating scale** reference explains the conventions below. Expanding it is optional; the action buttons stay available without opening it.
+
+## On matters of color coding
+
+### Zotero notes
+
+Use these same meanings for individual film moments:
+
+| Color             | Meaning                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| Yellow — Insight  | Insight I gained by paying attention or understanding, which I will lose unless written down. |
+| Red — Challenge   | Me challenging their statement or direction.                                                  |
+| Green — Novelty   | Something novel / a contribution of the paper or film.                                        |
+| Blue — Notation   | Notation — this shit is chopped in ML; I need to explain it to myself sometimes.              |
+| Purple — Summary  | Summary notes.                                                                                |
+| Orange — Confused | I don't get it!!! Right now I understand this: xxx…                                           |
+
+## On matters of scoring / rating
+
+Apply this film scale to individual moments, too:
+
+| Score | Rating                 | Meaning                                                                                                        |
+| ----- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 10    | Perfect                | I just get the feeling that I want to watch it again, or I remember it randomly.                               |
+| 9     | Amazing                | I don't randomly remember it, but when it's mentioned somewhere I think: man, I really want to watch it again. |
+| 8     | Great                  | It was a great movie, it's memorable, and I would recommend it to other people.                                |
+| 7     | Good                   | It was a good movie with some good scenes, but the quality felt lackluster at times.                           |
+| 6     | Fine                   | It is inconsistent with previous events, or just mediocre.                                                     |
+| 5     | Ok                     |                                                                                                                |
+| 4     | Meh                    |                                                                                                                |
+| 3     | Bad                    |                                                                                                                |
+| 2     | Horrible               |                                                                                                                |
+| 1     | Crime against humanity |                                                                                                                |
 
 Changing films or cuts cannot move a note draft to another timeline. Timeline identity includes your Introspect profile, configured Meta Egg server, film ID, and cut ID. The older direct-Jellyfin timelines remain separate and are not automatically merged with Meta Egg timelines.
 
@@ -86,12 +120,12 @@ OMDb supplies title-level metadata, not an edition-specific duration. It is an e
 
 In **Settings → Reading window**, change the fields and select **Save preferences**. Wait for **Preferences saved.**
 
-| Preference                  | Default         | UI choices or range                                                       |
-| --------------------------- | --------------- | ------------------------------------------------------------------------- |
-| Preferred subtitle language | English (`eng`) | English, Romanian, French, German, Spanish, Italian, Portuguese, Japanese |
-| Show before                 | 2 seconds       | Whole seconds, 0–60                                                       |
-| Keep after                  | 12 seconds      | Whole seconds, 1–120                                                      |
-| Default note color          | Amber           | Amber, mint, lilac, rose, sky                                             |
+| Preference                  | Default          | UI choices or range                                                       |
+| --------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| Preferred subtitle language | English (`eng`)  | English, Romanian, French, German, Spanish, Italian, Portuguese, Japanese |
+| Show before                 | 2 seconds        | Whole seconds, 0–60                                                       |
+| Keep after                  | 12 seconds       | Whole seconds, 1–120                                                      |
+| Default note color          | Yellow — Insight | Yellow, red, green, blue, purple, orange                                  |
 
 The reading window highlights a note from its timestamp minus **Show before** until its timestamp plus **Keep after**. It does not hide other notes or change timestamps. Server addresses, keys, polling intervals, and authentication are operator settings, not editable here.
 

@@ -659,10 +659,110 @@ a:focus-visible {
   --note-color: var(--lilac);
 }
 .note-rose {
-  --note-color: var(--rose);
+  --note-color: #ef8981;
 }
 .note-sky {
   --note-color: var(--sky);
+}
+.note-orange {
+  --note-color: #eea15b;
+}
+
+.moment-controls {
+  margin-block: 12px;
+}
+.moment-colors,
+.moment-ratings {
+  display: grid;
+  gap: 6px;
+}
+.moment-colors {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.moment-ratings {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.moment-controls button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.moment-controls button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--muted);
+}
+.moment-controls button:active:not(:disabled) {
+  background: var(--surface-soft);
+}
+.moment-controls button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.moment-controls button[aria-pressed="true"] {
+  border-color: var(--note-color, var(--amber-light));
+  background: color-mix(
+    in srgb,
+    var(--note-color, var(--amber-light)) 12%,
+    var(--surface)
+  );
+}
+.moment-color {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.moment-color span {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--note-color);
+}
+.moment-rating-heading,
+.moment-rating-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.moment-rating-heading {
+  margin-block: 12px 6px;
+}
+.moment-rating-hint {
+  min-height: 2.25rem;
+  margin-top: 6px;
+}
+.moment-guide {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.moment-guide summary {
+  cursor: pointer;
+  padding-block: 8px;
+}
+.moment-guide summary:focus-visible {
+  outline: 2px solid var(--amber-light);
+  outline-offset: 3px;
+}
+.moment-guide h3 {
+  color: var(--text);
+  margin: 24px 0 8px;
+}
+.moment-guide dt {
+  color: var(--text);
+  font-weight: 600;
+}
+.moment-guide dd {
+  margin: 4px 0 16px;
 }
 
 .timeline-section {
@@ -753,6 +853,16 @@ a:focus-visible {
 .note-body {
   min-width: 0;
   align-self: center;
+  container-type: inline-size;
+}
+
+@container (min-width: 500px) {
+  .moment-colors {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .moment-ratings {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+  }
 }
 
 .note-body > p {
@@ -1214,6 +1324,36 @@ a:focus-visible {
 }
 
 @media (max-width: 760px) {
+  .screening-page .composer-panel {
+    grid-row: 1;
+  }
+  .screening-page .notes-list {
+    padding-left: 0;
+  }
+  .screening-page .notes-list::before {
+    display: none;
+  }
+  .screening-page .timed-note {
+    display: flex;
+    flex-direction: column;
+  }
+  .screening-page .note-time {
+    position: static;
+    width: auto;
+    gap: 8px;
+    font-size: 0.75rem;
+  }
+  .screening-page .note-dot {
+    position: static;
+  }
+  .screening-page .note-body {
+    align-self: stretch;
+  }
+  .screening-page .note-actions {
+    position: absolute;
+    right: 12px;
+    top: 8px;
+  }
   .auth-container {
     display: block;
     padding: 1.4rem 1rem 2rem;

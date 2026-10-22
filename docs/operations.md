@@ -128,7 +128,7 @@ Rehearse into a separate deployment before replacing working data. The following
 4. Start it with `docker compose --env-file "$restore_env" -p introspect-restore up -d`. Check logs, API health, sign-in (if enabled), preferences, timeline counts, and known notes. For Live validation, use the original `JELLYFIN_URL`, account, item, and media source to preserve [timeline identity](architecture.md#timeline-and-runtime-rules). If that server is unavailable, [inspect restored notes through the API](#inspect-restored-notes-without-playback); demo playback cannot validate an existing Jellyfin timeline.
 5. Record the result before considering the backup verified. For production recovery, stop access/writers, preserve the current data separately, and restore into an empty replacement volume using the same sequence and matching application revision. Recheck the public URL, credentials, and data before reopening access.
 
-Starting a newer revision may migrate the restored database. Preserve an untouched backup first. There is no supported down-migration command; rolling back code alone does not undo schema or data changes. The new `meta_egg` runtime-source value uses the existing SQLite TEXT column and requires no SQL migration, but older releases may reject that value. Roll back with the retained prior database generation, rather than pointing an old app at a newer database. A successful health request alone is not evidence that notes, authentication, or a recovery succeeded.
+Starting a newer revision may migrate the restored database. Preserve an untouched backup first. Migration `0001_moment_ratings` adds a nullable integer rating column without rewriting existing notes or color preferences. New releases also accept textless pings and the orange color; older releases may reject these records even though the column is additive. Keep the pre-update data generation with its matching application revision for rollback, and preserve any later notes separately. There is no supported down-migration command; rolling back code alone does not undo schema or data changes. The new `meta_egg` runtime-source value uses the existing SQLite TEXT column and requires no SQL migration, but older releases may reject that value. Roll back with the retained prior database generation, rather than pointing an old app at a newer database. A successful health request alone is not evidence that notes, authentication, or a recovery succeeded.
 
 ### Inspect restored notes without playback
 
@@ -170,10 +170,11 @@ if (!restoredNotesResponse.ok) {
 }
 var restoredNotes = (await restoredNotesResponse.json()).notes;
 console.table(
-  restoredNotes.map(({ atSeconds, body, color }) => ({
+  restoredNotes.map(({ atSeconds, body, color, rating }) => ({
     atSeconds,
     body,
     color,
+    rating,
   })),
 );
 ```

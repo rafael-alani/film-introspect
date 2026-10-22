@@ -24,7 +24,11 @@ import {
 } from "@tabler/icons-react";
 import {
   formatTimestamp,
+  momentRatings,
+  noteColors,
+  type CreateNoteInput,
   type Note,
+  type UpdateNoteInput,
   type ScreeningCut,
   type ScreeningMovie,
 } from "@film-introspect/contracts";
@@ -32,6 +36,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "../api/client";
+import { MomentControls, MomentGuide } from "../components/moment-controls";
 import {
   clockPosition,
   cueWindow,
@@ -54,7 +59,7 @@ function TimedNote({
   position: number;
   lead: number;
   trail: number;
-  onUpdate: (note: Note, body: string) => void;
+  onUpdate: (note: Note, input: UpdateNoteInput) => Promise<unknown>;
   onDelete: (note: Note) => void;
   pending: boolean;
 }) {
@@ -62,6 +67,11 @@ function TimedNote({
   const [body, setBody] = useState(note.body);
   const isNear =
     note.atSeconds >= position - trail && note.atSeconds <= position + lead;
+  const saveChanges = (input: UpdateNoteInput) => {
+    void onUpdate(note, { ...(editing ? { body: body.trim() } : {}), ...input })
+      .then(() => setEditing(false))
+      .catch(() => {});
+  };
 
   return (
     <article
@@ -79,10 +89,37 @@ function TimedNote({
             minRows={2}
             maxRows={8}
             value={body}
+            maxLength={2000}
+            disabled={pending}
             onChange={(event) => setBody(event.currentTarget.value)}
           />
         ) : (
-          <Text>{note.body}</Text>
+          <>
+            {note.body && <Text>{note.body}</Text>}
+            <Text size="sm" c="dimmed">
+              {noteColors.find((item) => item.value === note.color)?.label}
+              {note.rating !== null &&
+                ` · ${note.rating}/10 ${momentRatings.find((item) => item.value === note.rating)?.label}`}
+            </Text>
+          </>
+        )}
+        <MomentControls
+          color={note.color}
+          rating={note.rating}
+          disabled={pending}
+          onColor={(color) => saveChanges({ color })}
+          onRating={(rating) => saveChanges({ rating })}
+        />
+        {note.rating !== null && (
+          <Button
+            variant="subtle"
+            size="compact-sm"
+            color="gray"
+            disabled={pending}
+            onClick={() => saveChanges({ rating: null })}
+          >
+            Clear rating
+          </Button>
         )}
       </div>
       <div className="note-actions">
@@ -92,11 +129,8 @@ function TimedNote({
               <ActionIcon
                 variant="subtle"
                 color="green"
-                disabled={!body.trim() || pending}
-                onClick={() => {
-                  onUpdate(note, body.trim());
-                  setEditing(false);
-                }}
+                disabled={pending}
+                onClick={() => saveChanges({ body: body.trim() })}
                 aria-label="Save changes"
               >
                 <IconCheck size={16} />
@@ -105,6 +139,7 @@ function TimedNote({
             <ActionIcon
               variant="subtle"
               color="gray"
+              disabled={pending}
               onClick={() => {
                 setBody(note.body);
                 setEditing(false);
@@ -119,7 +154,11 @@ function TimedNote({
             <ActionIcon
               variant="subtle"
               color="gray"
-              onClick={() => setEditing(true)}
+              disabled={pending}
+              onClick={() => {
+                setBody(note.body);
+                setEditing(true);
+              }}
               aria-label="Edit note"
             >
               <IconEdit size={16} />
@@ -392,6 +431,12 @@ function Screening({
   const [cueSearch, setCueSearch] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const [draftPosition, setDraftPosition] = useState<number | null>(null);
+  const [draftMark, setDraftMark] = useState<Pick<
+    CreateNoteInput,
+    "color" | "rating"
+  > | null>(null);
+  const saving = useRef(false);
+  const hasDraft = !!noteBody.trim() || draftMark !== null;
   const [feedback, setFeedback] = useState<string | null>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const timeline = useQuery({
@@ -467,9 +512,9 @@ function Screening({
   ]);
   useBlocker({
     shouldBlockFn: () =>
-      !!noteBody.trim() &&
+      hasDraft &&
       !window.confirm("Discard this unsaved note and leave the screening?"),
-    enableBeforeUnload: !!noteBody.trim(),
+    enableBeforeUnload: hasDraft,
   });
 
   const invalidateNotes = () =>
@@ -478,23 +523,23 @@ function Screening({
       queryClient.invalidateQueries({ queryKey: ["media"] }),
     ]);
   const createNote = useMutation({
-    mutationFn: (input: { atSeconds: number; body: string }) =>
-      api.createNote(mediaId!, {
-        ...input,
-        color: settings.data?.defaultNoteColor ?? "amber",
-      }),
-    onSuccess: () => {
+    mutationFn: (input: CreateNoteInput) => api.createNote(mediaId!, input),
+    onSuccess: async () => {
       setNoteBody("");
       setDraftPosition(null);
+      setDraftMark(null);
       textarea.current?.blur();
       setFeedback("Saved. Subtitles caught up to the film.");
-      void invalidateNotes();
+      await invalidateNotes();
     },
     onError: (cause) => setFeedback(errorMessage(cause)),
+    onSettled: () => {
+      saving.current = false;
+    },
   });
   const updateNote = useMutation({
-    mutationFn: ({ note, body }: { note: Note; body: string }) =>
-      api.updateNote(note.id, { body }),
+    mutationFn: ({ note, input }: { note: Note; input: UpdateNoteInput }) =>
+      api.updateNote(note.id, input),
     onSuccess: invalidateNotes,
     onError: (cause) => setFeedback(errorMessage(cause)),
   });
@@ -515,18 +560,35 @@ function Screening({
       setFeedback(null);
     }
   };
+  const saveMoment = (mark?: Pick<CreateNoteInput, "color" | "rating">) => {
+    if (!mediaId || saving.current || (!canNote && draftPosition === null))
+      return;
+    const selected = mark ?? draftMark;
+    if (!selected && !noteBody.trim()) return;
+    const captured =
+      draftPosition ??
+      Math.max(
+        0,
+        Math.min(
+          runtime ?? Infinity,
+          clockPosition(anchor, performance.now(), runtime) + offset,
+        ),
+      );
+    const input = {
+      atSeconds: Math.floor(captured),
+      body: noteBody,
+      color: selected?.color ?? settings.data?.defaultNoteColor ?? "amber",
+      rating: selected?.rating ?? null,
+    };
+    saving.current = true;
+    setDraftPosition(captured);
+    setDraftMark({ color: input.color, rating: input.rating });
+    setFeedback(null);
+    createNote.mutate(input);
+  };
   const save = (event?: FormEvent) => {
     event?.preventDefault();
-    if (
-      mediaId &&
-      noteBody.trim() &&
-      draftPosition !== null &&
-      !createNote.isPending
-    )
-      createNote.mutate({
-        atSeconds: Math.floor(draftPosition),
-        body: noteBody,
-      });
+    saveMoment();
   };
 
   return (
@@ -549,7 +611,7 @@ function Screening({
           color="gray"
           onClick={() => {
             if (
-              !noteBody.trim() ||
+              !hasDraft ||
               window.confirm(
                 "Discard this unsaved note and choose another film?",
               )
@@ -884,17 +946,34 @@ function Screening({
               </Text>
               <Text size="xs" c="dimmed" mt="xs">
                 {draftPosition === null
-                  ? "Tap to hold the subtitles. The film keeps moving."
+                  ? "One tap saves a color or rating, with any text below."
                   : `The film continues at ${formatTimestamp(position)}. Save to catch up.`}
               </Text>
             </div>
           </div>
           <form onSubmit={save}>
+            <MomentControls
+              disabled={
+                createNote.isPending || (!canNote && draftPosition === null)
+              }
+              onColor={(color) =>
+                saveMoment({ color, rating: draftMark?.rating ?? null })
+              }
+              onRating={(rating) =>
+                saveMoment({
+                  color:
+                    draftMark?.color ??
+                    settings.data?.defaultNoteColor ??
+                    "amber",
+                  rating,
+                })
+              }
+            />
             <Textarea
               ref={textarea}
               label="Quick note"
               className="note-composer"
-              placeholder="What did you notice?"
+              placeholder="What did you notice? Text is optional for pings."
               minRows={3}
               maxRows={8}
               autosize
@@ -922,11 +1001,12 @@ function Screening({
                 disabled={draftPosition === null || createNote.isPending}
                 onClick={() => {
                   if (
-                    !noteBody.trim() ||
+                    !hasDraft ||
                     window.confirm("Discard this unsaved note?")
                   ) {
                     setNoteBody("");
                     setDraftPosition(null);
+                    setDraftMark(null);
                     textarea.current?.blur();
                   }
                 }}
@@ -936,14 +1016,13 @@ function Screening({
               <Button
                 type="submit"
                 loading={createNote.isPending}
-                disabled={
-                  !mediaId || !noteBody.trim() || draftPosition === null
-                }
+                disabled={!mediaId || !hasDraft || draftPosition === null}
               >
-                Save & catch up
+                {createNote.isError ? "Retry & catch up" : "Save & catch up"}
               </Button>
             </div>
           </form>
+          <MomentGuide />
           {feedback && (
             <Text
               role="status"
@@ -999,8 +1078,8 @@ function Screening({
               lead={settings.data?.noteLeadSeconds ?? 2}
               trail={settings.data?.noteTrailSeconds ?? 12}
               pending={updateNote.isPending || deleteNote.isPending}
-              onUpdate={(target, body) =>
-                updateNote.mutate({ note: target, body })
+              onUpdate={(target, input) =>
+                updateNote.mutateAsync({ note: target, input })
               }
               onDelete={(target) => {
                 if (window.confirm("Delete this timed note?"))

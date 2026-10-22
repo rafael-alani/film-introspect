@@ -60,6 +60,12 @@ Actual runtime behavior in `repository.ts` is:
 - OMDb is a manual lookup-and-save action. Values saved with source `omdb` can be replaced by the next resolution, including by a missing Jellyfin duration; they are not a persistent automatic fallback.
 - Clearing an override restores the last stored Jellyfin duration, or unknown. The UI's **Use automatic** action also clears the edition label.
 
+## Moment annotations
+
+Notes support empty text for immediate color/rating pings and an optional integer `rating` (1–10, `null` when unrated). Every note retains a color; text saves and score-only pings use the configured default. Shared color/rating definitions feed both the inline controls and their reference guide. For stored-color compatibility, `amber`, `rose`, `mint`, `sky`, and `lilac` display as yellow, red, green, blue, and purple; `orange` is new. Existing note rows and preferences keep their IDs and values.
+
+A composer ping captures the current clock, or uses the already held draft timestamp. It submits immediately with any draft text, blocks duplicate pending saves, and catches up after success. Failed requests retain text, color, rating, and timestamp for explicit retry and navigation protection. Saved-note color/rating patches preserve omitted fields; defaults apply only on creation. The API validates rating bounds and the database enforces integer/null values in migration `0001_moment_ratings`. Ownership and cut identity are unchanged.
+
 ## Storage and deployment boundaries
 
 SQLite stores Better Auth users/accounts/sessions/verifications, preferences, observed media, edition labels, and notes. WAL, foreign keys, and a five-second busy timeout are enabled. Playback sessions and subtitle caches are in memory and are rebuilt after restart.

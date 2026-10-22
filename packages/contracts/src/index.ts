@@ -97,15 +97,101 @@ export const noteColorSchema = z.enum([
   "lilac",
   "rose",
   "sky",
+  "orange",
 ]);
 export type NoteColor = z.infer<typeof noteColorSchema>;
+
+export const noteColors = [
+  {
+    value: "amber",
+    name: "Yellow",
+    label: "Insight",
+    meaning:
+      "An insight I gained by paying attention or understanding, which I will lose unless I write it down.",
+  },
+  {
+    value: "rose",
+    name: "Red",
+    label: "Challenge",
+    meaning: "Me challenging their statement or direction.",
+  },
+  {
+    value: "mint",
+    name: "Green",
+    label: "Novelty",
+    meaning: "Something novel / a contribution of the paper or film.",
+  },
+  {
+    value: "sky",
+    name: "Blue",
+    label: "Notation",
+    meaning:
+      "Notation — this shit is chopped in ML; I need to explain it to myself sometimes.",
+  },
+  {
+    value: "lilac",
+    name: "Purple",
+    label: "Summary",
+    meaning: "Summary notes.",
+  },
+  {
+    value: "orange",
+    name: "Orange",
+    label: "Confused",
+    meaning: "I don't get it!!! Right now I understand this: xxx…",
+  },
+] as const satisfies readonly {
+  value: NoteColor;
+  name: string;
+  label: string;
+  meaning: string;
+}[];
+
+export const momentRatings = [
+  {
+    value: 10,
+    label: "Perfect",
+    meaning:
+      "I just get the feeling that I want to watch it again, or I remember it randomly.",
+  },
+  {
+    value: 9,
+    label: "Amazing",
+    meaning:
+      "I don't randomly remember it, but when it's mentioned somewhere I think: man, I really want to watch it again.",
+  },
+  {
+    value: 8,
+    label: "Great",
+    meaning:
+      "It was a great movie, it's memorable, and I would recommend it to other people.",
+  },
+  {
+    value: 7,
+    label: "Good",
+    meaning:
+      "It was a good movie with some good scenes, but the quality felt lackluster at times.",
+  },
+  {
+    value: 6,
+    label: "Fine",
+    meaning: "It is inconsistent with previous events, or just mediocre.",
+  },
+  { value: 5, label: "Ok", meaning: "" },
+  { value: 4, label: "Meh", meaning: "" },
+  { value: 3, label: "Bad", meaning: "" },
+  { value: 2, label: "Horrible", meaning: "" },
+  { value: 1, label: "Crime against humanity", meaning: "" },
+] as const;
+export const momentRatingSchema = z.number().int().min(1).max(10).nullable();
 
 export const noteSchema = z.object({
   id: z.string().uuid(),
   mediaId: z.string().uuid(),
   atSeconds: z.number().nonnegative(),
-  body: z.string().min(1).max(2000),
+  body: z.string().max(2000),
   color: noteColorSchema,
+  rating: momentRatingSchema,
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
 });
@@ -116,13 +202,15 @@ export const createNoteInputSchema = z.object({
     .number()
     .nonnegative()
     .max(60 * 60 * 24),
-  body: z.string().trim().min(1).max(2000),
+  body: z.string().trim().max(2000),
   color: noteColorSchema.default("amber"),
+  rating: momentRatingSchema.optional(),
 });
 export type CreateNoteInput = z.infer<typeof createNoteInputSchema>;
 
 export const updateNoteInputSchema = createNoteInputSchema
   .partial()
+  .extend({ color: noteColorSchema.optional() })
   .refine(
     (value) => Object.keys(value).length > 0,
     "At least one field is required",
