@@ -74,7 +74,7 @@ These legacy Library controls affect stored timeline metadata; they do not retim
 1. Open **Library** and select the relevant title card. The **Runtime override** dialog applies to that specific media source.
 2. Enter **Runtime in minutes** (0.1–1,440) and optionally an **Edition label** (up to 80 characters).
 3. Select **Save runtime**. A manual override persists across later playback snapshots and affects the displayed duration and playhead clamp. It does not move note timestamps.
-4. To return to Jellyfin metadata, select **Use automatic**. This also clears the edition label.
+4. To return to the supplied metadata, select **Use automatic**. This also clears the edition label.
 
 For an OMDb lookup, the operator must first configure `OMDB_API_KEY`. In the same dialog, enter the IMDb title ID (for example, `tt0133093`), select **Look up**, verify the returned title/runtime against the actual cut, then select **Save runtime**. Lookup alone does not save anything. On failure, check the ID and server configuration, or enter a manual duration.
 

@@ -30,6 +30,14 @@ import { api, apiAssetUrl, errorMessage } from "../api/client";
 
 type KindFilter = "all" | "movie" | "episode";
 
+const runtimeSourceLabels: Record<MediaSummary["runtimeSource"], string> = {
+  jellyfin: "Jellyfin",
+  meta_egg: "Meta Egg",
+  manual: "Manual",
+  omdb: "OMDb",
+  unknown: "Unknown",
+};
+
 function detailLine(media: MediaSummary): string {
   if (media.kind === "episode") {
     const episode =
@@ -325,12 +333,12 @@ export function LibraryPage() {
             </div>
             <Text size="sm" c="dimmed">
               Override the duration when the theatrical, director’s, or extended
-              cut differs from Jellyfin. Clear it to return to automatic
-              metadata.
+              cut differs from the supplied metadata. Clear it to return to
+              automatic metadata.
             </Text>
             <NumberInput
               label="Runtime in minutes"
-              description={`Current source: ${selected.runtimeSource}`}
+              description={`Current source: ${runtimeSourceLabels[selected.runtimeSource]}`}
               placeholder="e.g. 142"
               min={0.1}
               max={1440}
