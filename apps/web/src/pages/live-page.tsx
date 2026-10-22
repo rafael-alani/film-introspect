@@ -274,10 +274,31 @@ export function LivePage() {
           {source === "jellyfin"
             ? `Browse ${jellyfin.data?.serverName ?? "Jellyfin"}. Subtitles come from your selected media version; playback can follow your device.`
             : "Find a matching subtitle release and align it with the film on screen."}{" "}
-          {!jellyfin.data?.configured && (
+          {jellyfin.isSuccess && !jellyfin.data.configured && (
             <a href="/settings">Connect Jellyfin in Settings</a>
           )}
         </Text>
+        {jellyfin.isPending && (
+          <Text size="sm" c="dimmed" role="status">
+            Loading your Jellyfin connection… You can use Any screen meanwhile.
+          </Text>
+        )}
+        {jellyfin.isError && (
+          <div role="alert">
+            <Text size="sm">
+              Could not load your Jellyfin connection. Try again to see your
+              saved server. Any screen is still available.
+            </Text>
+            <Button
+              variant="subtle"
+              size="sm"
+              loading={jellyfin.isFetching}
+              onClick={() => void jellyfin.refetch()}
+            >
+              Retry connection
+            </Button>
+          </div>
+        )}
       </Stack>
       <form
         className="screening-search"

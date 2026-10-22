@@ -114,7 +114,8 @@ const fixture = Bun.serve({
   },
 });
 const serve = process.argv.includes("--serve");
-const port = serve ? 3001 : 19371;
+const connectionError = serve && process.argv.includes("--connection-error");
+const port = serve && !connectionError ? 3001 : 19371;
 const child = Bun.spawn([process.execPath, "src/index.ts"], {
   cwd: resolve(import.meta.dir, "../apps/api"),
   env: {
@@ -376,13 +377,41 @@ try {
     `PASS (${provider}): Meta Egg search/no-match, metadata with subtitle statuses, cuts, transcript provenance, save acknowledgements, timeline reuse, cut isolation, note timestamp, empty-text color/rating pings, partial edits, rating validation, invalid timeline, wrong-cut rejection, and safe upstream/storage errors.`,
   );
   if (serve) {
+    let connectionFailures = 0;
+    const proxy = connectionError
+      ? Bun.serve({
+          hostname: "127.0.0.1",
+          port: 3001,
+          async fetch(request) {
+            const url = new URL(request.url);
+            if (
+              url.pathname === "/api/settings/jellyfin" &&
+              request.method === "GET" &&
+              connectionFailures++ < 4
+            )
+              return Response.json(
+                {
+                  error: {
+                    code: "FIXTURE_UNAVAILABLE",
+                    message: "Synthetic connection lookup failure",
+                  },
+                },
+                { status: 503 },
+              );
+            return fetch(
+              new Request(`${base}${url.pathname}${url.search}`, request),
+            );
+          },
+        })
+      : null;
     console.info(
-      `Isolated browser fixture API at ${base}; run the web dev server separately. Ctrl-C to stop.`,
+      `Isolated browser fixture API at ${connectionError ? "http://127.0.0.1:3001" : base}; run the web dev server separately. Ctrl-C to stop.`,
     );
     await new Promise<void>((done) => {
       process.on("SIGINT", done);
       process.on("SIGTERM", done);
     });
+    proxy?.stop(true);
   }
 } finally {
   child.kill();
