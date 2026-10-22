@@ -5,7 +5,72 @@ import {
   notePosition,
   parseScreeningTime,
   sessionAnchor,
+  chooseScreeningSession,
+  sessionIsFresh,
 } from "../apps/web/src/hooks/screening-clock";
+import type { ScreeningSession } from "@film-introspect/contracts";
+
+test("defaults to a fresh playing device for the exact cut and preserves an explicit device", () => {
+  const now = Date.parse("2026-10-22T12:00:00Z");
+  const session: ScreeningSession = {
+    id: "tv",
+    itemId: "film",
+    cutId: "cut",
+    deviceName: "TV",
+    state: "playing",
+    positionSeconds: 100,
+    observedAt: new Date(now - 1000).toISOString(),
+  };
+  const paused: ScreeningSession = {
+    ...session,
+    id: "paused",
+    state: "paused",
+    observedAt: new Date(now - 600_000).toISOString(),
+  };
+  const stale = {
+    ...session,
+    id: "stale",
+    observedAt: new Date(now - 31_000).toISOString(),
+  };
+  const sessions = [
+    paused,
+    stale,
+    { ...session, id: "other-cut", cutId: "other" },
+    { ...session, id: "other-film", itemId: "other" },
+    session,
+  ];
+  expect(chooseScreeningSession(sessions, "film", "cut", null, now)?.id).toBe(
+    "tv",
+  );
+  expect(
+    chooseScreeningSession(sessions, "film", "cut", "paused", now)?.id,
+  ).toBe("paused");
+  expect(
+    chooseScreeningSession(sessions, "film", "cut", "disconnected", now),
+  ).toBeUndefined();
+  expect(
+    chooseScreeningSession([stale], "film", "cut", null, now),
+  ).toBeUndefined();
+  expect(sessionIsFresh(paused, now)).toBe(true);
+  expect(
+    sessionIsFresh(
+      { ...session, observedAt: new Date(now + 6000).toISOString() },
+      now,
+    ),
+  ).toBe(false);
+  expect(
+    chooseScreeningSession(
+      [
+        session,
+        { ...session, id: "newer", observedAt: new Date(now).toISOString() },
+      ],
+      "film",
+      "cut",
+      null,
+      now,
+    )?.id,
+  ).toBe("newer");
+});
 
 describe("screening clock and held notes", () => {
   test("holds the scene while the film advances, then catches up without pausing", () => {

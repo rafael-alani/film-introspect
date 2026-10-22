@@ -178,9 +178,12 @@ export const api = {
       `/api/screening/movies/${encodeURIComponent(item)}/cuts/${encodeURIComponent(cut)}/subtitles/${index}?source=${source}`,
       screeningTranscriptSchema,
     ),
-  screeningSessions: (itemId: string, source: ScreeningSource = "external") =>
+  screeningSessions: (
+    itemId: string | undefined,
+    source: ScreeningSource = "external",
+  ) =>
     request(
-      `/api/screening/sessions?itemId=${encodeURIComponent(itemId)}&source=${source}`,
+      `/api/screening/sessions?source=${source}${itemId === undefined ? "" : `&itemId=${encodeURIComponent(itemId)}`}`,
       screeningSessionsSchema,
     ),
   screeningTimeline: (

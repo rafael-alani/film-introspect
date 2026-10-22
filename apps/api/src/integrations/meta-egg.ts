@@ -144,9 +144,9 @@ export const metaEgg = {
       );
     return result;
   },
-  sessions: (itemId: string, connection?: JellyfinContext | null) =>
+  sessions: (itemId: string | undefined, connection?: JellyfinContext | null) =>
     metaEggRequest(
-      `sessions?itemId=${encodeURIComponent(itemId)}&source=${connection ? "jellyfin" : "external"}`,
+      `sessions?source=${connection ? "jellyfin" : "external"}${itemId === undefined ? "" : `&itemId=${encodeURIComponent(itemId)}`}`,
       screeningSessionsSchema,
       connection,
     ),

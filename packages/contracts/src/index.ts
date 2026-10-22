@@ -430,6 +430,8 @@ export const screeningSessionsSchema = z.object({
     z.object({
       id: z.string(),
       itemId: z.string(),
+      title: z.string().min(1).optional(),
+      runtimeSeconds: z.number().nonnegative().nullable().optional(),
       cutId: z.string().nullable(),
       deviceName: z.string(),
       state: z.enum(["playing", "paused"]),

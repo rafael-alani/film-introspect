@@ -1683,6 +1683,16 @@ a:focus-visible {
 .screening-page {
   max-width: 1000px;
 }
+.screening-now-playing {
+  margin-bottom: 32px;
+}
+.screening-now-playing > h2 {
+  margin-bottom: 12px;
+}
+.screening-active-session {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
 .screening-search {
   display: flex;
   align-items: flex-end;

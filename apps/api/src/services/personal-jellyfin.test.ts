@@ -85,6 +85,15 @@ test("personal credentials are encrypted, owner-bound and never returned; failed
   expect(upstream.at(-1)?.key).toBe(key);
   await app.request("/api/screening/movies?query=test&source=external");
   expect(upstream.at(-1)?.key).toBeNull();
+  response = await app.request("/api/screening/sessions?source=jellyfin");
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ data: [] });
+  expect(upstream.at(-1)?.key).toBe(key);
+  expect(new URL(upstream.at(-1)!.url).searchParams.has("itemId")).toBe(false);
+  await app.request("/api/screening/sessions?itemId=film&source=jellyfin");
+  expect(new URL(upstream.at(-1)!.url).searchParams.get("itemId")).toBe("film");
+  await app.request("/api/screening/sessions?source=external");
+  expect(upstream.at(-1)?.key).toBeNull();
   const reads = upstream.length;
   expect((await post("file:///etc/passwd", key)).status).toBe(400);
   expect(upstream.length).toBe(reads);

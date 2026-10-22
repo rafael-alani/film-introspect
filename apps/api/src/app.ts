@@ -216,7 +216,7 @@ api.get("/screening/movies/:itemId/cuts/:cutId/subtitles/:index", async (c) => {
 });
 api.get("/screening/sessions", async (c) => {
   const itemId = c.req.query("itemId");
-  if (!itemId)
+  if (itemId !== undefined && (!itemId.trim() || itemId.length > 200))
     return errorResponse(c, 400, "INVALID_ITEM", "Choose a film first.");
   return c.json(await metaEgg.sessions(itemId, screeningConnection(c)));
 });

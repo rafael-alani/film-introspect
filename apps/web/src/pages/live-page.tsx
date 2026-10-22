@@ -31,6 +31,7 @@ import {
   type UpdateNoteInput,
   type ScreeningCut,
   type ScreeningMovie,
+  type ScreeningSession,
 } from "@film-introspect/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
@@ -43,6 +44,8 @@ import {
   notePosition,
   parseScreeningTime,
   sessionAnchor,
+  sessionIsFresh,
+  chooseScreeningSession,
   type ClockAnchor,
 } from "../hooks/screening-clock";
 
@@ -184,7 +187,11 @@ export function LivePage() {
     queryKey: ["jellyfin-settings"],
     queryFn: api.jellyfinSettings,
   });
-  const [source, setSource] = useState<"external" | "jellyfin">("external");
+  const [chosenSource, setSource] = useState<"external" | "jellyfin" | null>(
+    null,
+  );
+  const source =
+    chosenSource ?? (jellyfin.data?.configured ? "jellyfin" : "external");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [movieId, setMovieId] = useState<string | null>(null);
@@ -192,11 +199,44 @@ export function LivePage() {
   const [screening, setScreening] = useState<{
     movie: ScreeningMovie;
     cut: ScreeningCut;
+    initialSessionId?: string;
   } | null>(null);
+  const nowPlaying = useQuery({
+    queryKey: ["screening-now-playing", jellyfin.data?.url],
+    queryFn: () => api.screeningSessions(undefined, "jellyfin"),
+    enabled: !!jellyfin.data?.configured && !screening,
+    refetchInterval: 2000,
+    retry: 1,
+  });
+  const activeSessions = (nowPlaying.data?.data ?? []).filter((session) =>
+    sessionIsFresh(session, Date.now()),
+  );
+  const followPlaying = useMutation({
+    mutationFn: async (session: ScreeningSession) => {
+      const { data: movie } = await api.screeningMovie(
+        session.itemId,
+        "jellyfin",
+      );
+      const cut = movie.cuts.find((cut) => cut.id === session.cutId);
+      if (!cut)
+        throw new Error(
+          "This player has not identified an available media version. Choose the film and version below.",
+        );
+      if (!cut.subtitles.some((track) => track.available))
+        throw new Error(
+          "The playing version has no readable subtitles. Choose another film or use Any screen with a matching subtitle release.",
+        );
+      return { movie, cut, initialSessionId: session.id };
+    },
+    onSuccess: (selection) => {
+      setSource("jellyfin");
+      setScreening(selection);
+    },
+  });
   const movies = useQuery({
     queryKey: ["screening-movies", source, jellyfin.data?.url, query],
     queryFn: () => api.screeningMovies(query, source),
-    enabled: query.length > 0,
+    enabled: query.length > 0 && (!jellyfin.isPending || chosenSource !== null),
     retry: 1,
   });
   const movie = useQuery({
@@ -245,6 +285,80 @@ export function LivePage() {
           </Text>
         </div>
       </header>
+      {jellyfin.data?.configured && (
+        <section
+          className="screening-now-playing"
+          aria-label="Now playing on Jellyfin"
+        >
+          <Title order={2}>
+            Now playing on {jellyfin.data.serverName ?? "Jellyfin"}
+          </Title>
+          {nowPlaying.isPending && (
+            <Text c="dimmed" role="status">
+              Checking your players…
+            </Text>
+          )}
+          {nowPlaying.isError ? (
+            <Text role="alert" className="form-error">
+              Could not check your players. {errorMessage(nowPlaying.error)}{" "}
+              <Button
+                variant="subtle"
+                onClick={() => void nowPlaying.refetch()}
+              >
+                Try again
+              </Button>
+            </Text>
+          ) : activeSessions.length ? (
+            activeSessions.map((session) => (
+              <Group
+                key={session.id}
+                className="screening-active-session"
+                justify="space-between"
+              >
+                <div>
+                  <Text fw={650}>{session.title ?? "Jellyfin playback"}</Text>
+                  <Text size="sm" c="dimmed">
+                    {session.deviceName} ·{" "}
+                    {session.state === "paused" ? "Paused" : "Playing"} ·{" "}
+                    {formatTimestamp(session.positionSeconds)}
+                    {session.runtimeSeconds != null &&
+                      ` / ${formatTimestamp(session.runtimeSeconds)}`}
+                  </Text>
+                  {!session.cutId && (
+                    <Text size="sm" c="dimmed">
+                      Waiting for the player to identify its media version.
+                    </Text>
+                  )}
+                </div>
+                <Button
+                  variant="default"
+                  loading={
+                    followPlaying.isPending &&
+                    followPlaying.variables?.id === session.id
+                  }
+                  disabled={!session.cutId || followPlaying.isPending}
+                  onClick={() => followPlaying.mutate(session)}
+                  aria-label={`Follow ${session.title ?? "playback"} on ${session.deviceName}`}
+                >
+                  Follow playback
+                </Button>
+              </Group>
+            ))
+          ) : (
+            !nowPlaying.isPending && (
+              <Text c="dimmed" size="sm">
+                Nothing is playing right now. Start a film on Jellyfin and it
+                will appear here.
+              </Text>
+            )
+          )}
+          {followPlaying.isError && (
+            <Text role="alert" className="form-error">
+              {errorMessage(followPlaying.error)}
+            </Text>
+          )}
+        </section>
+      )}
       <Stack gap="xs" mb="lg">
         <Select
           label="Where are you watching?"
@@ -268,6 +382,7 @@ export function LivePage() {
             setSource(value === "jellyfin" ? "jellyfin" : "external");
             setMovieId(null);
             setCutId(null);
+            followPlaying.reset();
           }}
         />
         <Text size="sm" c="dimmed">
@@ -311,7 +426,11 @@ export function LivePage() {
         }}
       >
         <TextInput
-          label="Find a film in Meta Egg"
+          label={
+            source === "jellyfin"
+              ? `Find a film on ${jellyfin.data?.serverName ?? "Jellyfin"}`
+              : "Find a film for any screen"
+          }
           placeholder="Movie title"
           value={search}
           onChange={(event) => {
@@ -332,14 +451,19 @@ export function LivePage() {
       </form>
       {!query && (
         <Text c="dimmed" mt="lg">
-          Search for a film. Meta Egg looks up its metadata and available
-          subtitle versions for the screen you are watching.
+          {source === "jellyfin"
+            ? "Search the films available on your Jellyfin server."
+            : "Search for a film and a matching subtitle release for the screen you are watching."}
         </Text>
       )}
       {currentSearch && movies.isFetching && (
         <Group mt="xl" role="status" aria-live="polite">
           <Loader size="sm" />
-          <Text c="dimmed">Meta Egg is searching film metadata…</Text>
+          <Text c="dimmed">
+            {source === "jellyfin"
+              ? "Searching your Jellyfin library…"
+              : "Searching film metadata…"}
+          </Text>
         </Group>
       )}
       {currentSearch && movies.isError && !movies.isFetching && (
@@ -352,7 +476,9 @@ export function LivePage() {
       )}
       {showResults && movies.data?.data.length === 0 && (
         <Text c="dimmed" mt="xl">
-          Meta Egg found no matching film. Try another spelling or title.
+          {source === "jellyfin"
+            ? "No matching film in your Jellyfin library. Try another title, or choose Any screen to search online."
+            : "No matching film found. Try another spelling or title."}
         </Text>
       )}
       <div className="screening-results">
@@ -483,12 +609,14 @@ function Screening({
   onLeave,
   serverName,
   sourceKey,
+  initialSessionId,
 }: {
   movie: ScreeningMovie;
   cut: ScreeningCut;
   onLeave: () => void;
   serverName: string | null;
   sourceKey: string;
+  initialSessionId?: string;
 }) {
   const queryClient = useQueryClient();
   const [trackIndex, setTrackIndex] = useState<string | null>(() => {
@@ -504,7 +632,9 @@ function Screening({
   const [mode, setMode] = useState(
     movie.provider === "jellyfin" ? "jellyfin" : "manual",
   );
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(
+    initialSessionId ?? null,
+  );
   const [anchor, setAnchor] = useState<ClockAnchor>({
     position: 0,
     at: performance.now(),
@@ -549,9 +679,17 @@ function Screening({
   const matchingSessions = (sessions.data?.data ?? []).filter(
     (session) => session.itemId === movie.id && session.cutId === cut.id,
   );
-  const selectedSession = matchingSessions.find(
-    (session) => session.id === sessionId,
+  const selectedSession = chooseScreeningSession(
+    matchingSessions,
+    movie.id,
+    cut.id,
+    sessionId,
+    Date.now(),
   );
+  useEffect(() => {
+    if (mode === "jellyfin" && sessionId === null && selectedSession)
+      setSessionId(selectedSession.id);
+  }, [mode, sessionId, selectedSession?.id]);
   const notes = useQuery({
     queryKey: ["notes", mediaId],
     queryFn: () => api.notes(mediaId!),
@@ -571,12 +709,12 @@ function Screening({
   const visibleCues = cueWindow(cues, displayPosition);
   const stale =
     mode === "jellyfin" &&
+    sessionId !== null &&
+    !sessions.isPending &&
     (!selectedSession ||
       sessions.isError ||
       Date.now() - sessions.dataUpdatedAt > 10_000 ||
-      (selectedSession.state === "playing" &&
-        Date.now() - Date.parse(selectedSession.observedAt) > 30_000) ||
-      Date.parse(selectedSession.observedAt) - Date.now() > 5_000);
+      !sessionIsFresh(selectedSession, Date.now()));
   const canNote =
     !!mediaId &&
     (mode === "manual" ? anchor.running : !!selectedSession && !stale);
@@ -828,6 +966,8 @@ function Screening({
             <>
               <Select
                 label="Device playing this exact cut"
+                description="A matching player is selected automatically. You can switch devices here."
+                allowDeselect={false}
                 placeholder="Choose a device"
                 value={sessionId}
                 onChange={setSessionId}
@@ -844,9 +984,9 @@ function Screening({
               )}
               {!sessions.isLoading && !matchingSessions.length && (
                 <Text c="dimmed" size="sm">
-                  No permitted device is playing this exact cut. Start it with
-                  Meta Egg's configured Jellyfin user, or use the
-                  external-screen clock.
+                  No permitted device is playing this exact cut. Start this
+                  version on your Jellyfin player, or use the external-screen
+                  clock.
                 </Text>
               )}
               <Text size="xs" c="dimmed">
@@ -898,9 +1038,23 @@ function Screening({
               ? anchor.running
                 ? "Screening clock running"
                 : "Set the clock to begin"
-              : (selectedSession?.state ?? "Choose device")}
+              : (selectedSession?.state ??
+                (sessions.isPending
+                  ? "Finding your player"
+                  : "Waiting for playback"))}
         </Badge>
       </Group>
+      {mode === "jellyfin" && selectedSession && !stale && (
+        <Text size="sm" c="dimmed">
+          Following {selectedSession.deviceName}
+        </Text>
+      )}
+      {mode === "jellyfin" && sessionId === null && !sessions.isError && (
+        <Text size="sm" c="dimmed">
+          Start this version on Jellyfin. Live timing and notes will connect to
+          a matching player automatically.
+        </Text>
+      )}
       {stale && (
         <Text role="alert" size="sm" className="form-error">
           Live timing is unavailable. The clock is an estimate until the device

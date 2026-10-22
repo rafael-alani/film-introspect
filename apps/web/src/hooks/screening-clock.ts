@@ -2,6 +2,40 @@ import type { ScreeningSession, SubtitleCue } from "@film-introspect/contracts";
 
 export type ClockAnchor = { position: number; at: number; running: boolean };
 
+export function sessionIsFresh(
+  session: ScreeningSession,
+  now: number,
+): boolean {
+  const age = now - Date.parse(session.observedAt);
+  return (
+    Number.isFinite(age) &&
+    age >= -5_000 &&
+    (session.state === "paused" || age <= 30_000)
+  );
+}
+
+export function chooseScreeningSession(
+  sessions: ScreeningSession[],
+  itemId: string,
+  cutId: string,
+  selectedId: string | null,
+  now: number,
+): ScreeningSession | undefined {
+  const matching = sessions.filter(
+    (session) => session.itemId === itemId && session.cutId === cutId,
+  );
+  if (selectedId !== null)
+    return matching.find((session) => session.id === selectedId);
+  return matching
+    .filter((session) => sessionIsFresh(session, now))
+    .sort(
+      (a, b) =>
+        Number(b.state === "playing") - Number(a.state === "playing") ||
+        Date.parse(b.observedAt) - Date.parse(a.observedAt) ||
+        a.id.localeCompare(b.id),
+    )[0];
+}
+
 export function clockPosition(
   anchor: ClockAnchor,
   now: number,

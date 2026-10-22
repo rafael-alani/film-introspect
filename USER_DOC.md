@@ -4,17 +4,17 @@ This guide describes the candidate screening MVP. It is designed for a cinema, a
 
 ## Capability index
 
-| Goal                                                | Entrypoint                                                    |
-| --------------------------------------------------- | ------------------------------------------------------------- |
-| Use a shared local profile or separate accounts     | [Access your journal](#access-your-journal)                   |
-| Find a film/cut and synchronize its subtitles       | [Follow playback](#follow-playback)                           |
-| Read dialogue near the playhead                     | [Read subtitles](#read-subtitles)                             |
-| Add, color-code, rate, and edit moments             | [Write and revisit notes](#write-and-revisit-notes)           |
-| Browse previously opened timelines                  | [Browse the library](#browse-the-library)                     |
-| Label an edition, override runtime, or look up OMDb | [Manage runtimes and editions](#manage-runtimes-and-editions) |
-| Set language, highlighting window, and note color   | [Set preferences](#set-preferences)                           |
-| Connect Jellyfin and check shared subtitle service status | [Check connections](#check-connections)                |
-| Preview without a Jellyfin server                   | [Try demo mode](#try-demo-mode)                               |
+| Goal                                                      | Entrypoint                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| Use a shared local profile or separate accounts           | [Access your journal](#access-your-journal)                   |
+| Find a film/cut and synchronize its subtitles             | [Follow playback](#follow-playback)                           |
+| Read dialogue near the playhead                           | [Read subtitles](#read-subtitles)                             |
+| Add, color-code, rate, and edit moments                   | [Write and revisit notes](#write-and-revisit-notes)           |
+| Browse previously opened timelines                        | [Browse the library](#browse-the-library)                     |
+| Label an edition, override runtime, or look up OMDb       | [Manage runtimes and editions](#manage-runtimes-and-editions) |
+| Set language, highlighting window, and note color         | [Set preferences](#set-preferences)                           |
+| Connect Jellyfin and check shared subtitle service status | [Check connections](#check-connections)                       |
+| Preview without a Jellyfin server                         | [Try demo mode](#try-demo-mode)                               |
 
 ## Access your journal
 
@@ -28,7 +28,7 @@ These are Introspect accounts, not Jellyfin accounts. Enabling authentication do
 
 ## Follow playback
 
-1. On **Live**, enter a film title and select **Search films**. Meta Egg looks up metadata in its configured sources; the page shows progress while waiting. Submitting the same title repeats the lookup. The standalone pilot search is **Sintel**.
+1. On **Live**, enter a film title and select **Search films**. A saved Jellyfin connection searches your server by default; choose **Any screen** for the online and standalone catalog flow below. Meta Egg looks up metadata in its configured sources; the page shows progress while waiting. Submitting the same title repeats the lookup. The standalone pilot search is **Sintel**.
 2. Select the movie. Its metadata appears while Meta Egg finds subtitle versions. Choose the **Cut / subtitle version** you are watching, then **Open screening**. A version's runtime helps identify it; an unlabeled file is not proof of a theatrical or director's cut. Different cuts retain separate notes and subtitle timing.
 3. Select an available **Subtitle track**. Only text subtitles are supported. If no version can be supplied, the movie remains visible with a reason: the provider is not configured, no release was found, or the source is unavailable. Use **Retry subtitle search** after a temporary failure or configuration change. Opening a screening requires an available text track. A matching SRT/VTT can also be supplied through Meta Egg's standalone catalog; Introspect cannot OCR or create missing transcripts.
 4. Open **Sync with the screen** and align with the film on your other screen. A supplied **Watch reference film** link opens the matching licensed video separately; it is optional and Introspect does not control it. Source attribution, license links and provider terms come from Meta Egg. A provider terms link does not imply an open license.
@@ -37,7 +37,11 @@ With Meta Egg's private screening storage configured, selecting an online movie 
 
 For standalone catalog and online discovery entries, the external-screen clock is the only mode. Enter the film's current time as `mm:ss` or `h:mm:ss`, then tap **Sync now** at that moment. At the start, enter `0:00` and tap when the film begins. Alternatively, expand **Sync to a line of dialogue**, search for a line, and tap it when it starts on screen. Use **−0.5 s** or **+0.5 s** to correct drift. Keep the page open; reopening it requires another timing anchor.
 
-Connect your server in Settings, then select its name under **Where are you watching?**. The subtitle selection screen shows that server and its exact media versions. Jellyfin screenings start with **Follow a device**; select a device playing the exact same item and media source. A personal access token scopes visibility to its Jellyfin user; server API keys may see all permitted sessions. A different user's player or a player without media-source identity is not eligible. Introspect observes play, pause and seek; it never controls the movie. **Sync unavailable** means timing is currently an estimate. Reconnect or switch to a manual anchor before starting another note.
+When a Jellyfin connection is saved in Settings, **Live** searches that server's available films by default. **Any screen** remains available for online subtitle searches and manual alignment. **Now playing** appears as soon as a permitted player is active, showing its film, device and current position. Choose **Follow playback** to open that player's exact media version directly; a missing version or readable subtitle track is reported instead of choosing another cut.
+
+Jellyfin screenings automatically select a matching device: a fresh playing session is preferred over a paused one, then the most recently observed session. Open **Sync with the screen → Device playing this exact cut** to switch devices. Your selection stays fixed if that player disconnects; another device never silently takes over. **Waiting for playback** means no matching player is available yet. Start that version on Jellyfin and it will connect automatically. **Sync unavailable** after a selection means timing is currently an estimate; reconnect or switch to a manual anchor before starting another note.
+
+A personal access token scopes visibility to its Jellyfin user; server API keys may see all permitted sessions. A player without media-source identity cannot supply automatic timing. Introspect observes play, pause and seek; it never controls the movie.
 
 A declared subtitle version identifies the timing source; it does not automatically identify the film print or cut on your screen. Follow the version's matching notes, verify several spoken lines, and correct the anchor if needed. A matching cut and a good timing anchor are required. This MVP has no microphone/audio recognition, and network/player latency can affect the Jellyfin clock. Check the first few lines against the screen and correct the clock; frame-accurate synchronization is not claimed.
 
@@ -133,7 +137,7 @@ The reading window highlights a note from its timestamp minus **Show before** un
 
 In **Settings → Your Jellyfin server**, enter the server address and an API key or personal access token, then choose **Test and save connection**. The server name appears after validation. Enter a replacement key to update the connection; a failed test keeps the saved connection. **Disconnect** removes the saved key and keeps your notes in Library. Saved keys are never displayed. With sign-in enabled each Introspect account has its own connection; the login-disabled Local viewer is one shared profile.
 
-Choose **Any screen** in Live for the usual subtitle-release lookup and manual clock. Choose the saved server name for exact media versions, server subtitles and device playback following. Changing servers creates separate note timelines even when item IDs match. Connecting Jellyfin never changes playback or downloads media.
+Live defaults to the saved server for library search, exact media versions, server subtitles and automatic device following. Choose **Any screen** for subtitle-release lookup and a manual clock. Changing servers creates separate note timelines even when item IDs match. Connecting Jellyfin never changes playback or downloads media.
 
 **Settings → OpenSubtitles** shows whether the shared API key is configured. **Check services** refreshes that status; it does not prove the key works or that quota remains. A real subtitle lookup checks availability. The service operator manages this key for all viewers.
 
