@@ -1,8 +1,18 @@
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 
+const provider = process.argv.includes("--jellyfin") ? "jellyfin" : "catalog";
+const precision = provider === "catalog" ? "subtitle_version" : "media_source";
+const provenance = {
+  sourceUrl: "https://example.invalid/fixture",
+  licenseUrl: "https://example.invalid/license",
+  attribution: "Synthetic contract fixture, not a real film.",
+};
+
 // Isolated contract fixture for API checks and a browser walkthrough; never a production fallback.
 const movie = {
+  provider,
+  provenance,
   id: "fixture-film",
   title: "Screening timing fixture",
   year: 2026,
@@ -14,7 +24,11 @@ const cuts = ["theatrical", "extended"].map((id) => ({
   id,
   label: id === "theatrical" ? "Theatrical test cut" : "Extended test cut",
   runtimeSeconds: 600,
-  precision: "media_source",
+  precision,
+  editionId: id,
+  referenceVideoUrl: null,
+  matchingNotes:
+    "Synthetic test subtitles. Real screenings require a matching transcript.",
   subtitles: [
     {
       id: "0",
@@ -43,8 +57,9 @@ const fixture = Bun.serve({
           cutId: corruptTranscript ? "other-cut" : url.pathname.split("/")[6],
           trackId: "0",
           language: "eng",
-          source: "jellyfin",
-          precision: "media_source",
+          source: provider,
+          precision,
+          provenance,
           cues: Array.from({ length: 120 }, (_, i) => ({
             id: String(i),
             startSeconds: i * 5,
@@ -118,6 +133,8 @@ try {
   assert.equal((await fetch(`${base}/api/screening/movies`)).status, 400);
   const found = await request("/screening/movies?query=fixture");
   assert.equal(found.data[0].id, movie.id);
+  assert.equal(found.data[0].provider, provider);
+  assert.equal(found.data[0].provenance.attribution, provenance.attribution);
   if (process.argv.includes("--slow")) {
     const delayed = await request("/screening/movies?query=slow-fixture");
     assert.equal(delayed.data[0].id, movie.id);
@@ -127,11 +144,15 @@ try {
   }
   const detail = await request(`/screening/movies/${movie.id}`);
   assert.equal(detail.data.cuts.length, 2);
+  assert.equal(detail.data.cuts[0].precision, precision);
+  assert.equal(detail.data.cuts[0].editionId, "theatrical");
   const transcript = await request(
     `/screening/movies/${movie.id}/cuts/theatrical/subtitles/0`,
   );
   assert.equal(transcript.data.cutId, "theatrical");
   assert.equal(transcript.data.cues.length, 120);
+  assert.equal(transcript.data.source, provider);
+  assert.equal(transcript.data.precision, precision);
   const first = await request("/screening/timeline", "POST", {
     itemId: movie.id,
     cutId: "theatrical",
@@ -141,6 +162,15 @@ try {
     cutId: "theatrical",
   });
   assert.equal(first.id, same.id);
+  assert.equal(first.runtimeSource, "meta_egg");
+  await request(`/media/${first.id}/runtime`, "PATCH", {
+    runtimeSeconds: 610,
+    source: "manual",
+  });
+  const reset = await request(`/media/${first.id}/runtime`, "PATCH", {
+    runtimeSeconds: null,
+  });
+  assert.equal(reset.runtimeSource, "meta_egg");
   const other = await request("/screening/timeline", "POST", {
     itemId: movie.id,
     cutId: "extended",

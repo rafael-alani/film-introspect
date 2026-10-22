@@ -189,7 +189,7 @@ api.post(
         seasonNumber: null,
         episodeNumber: null,
         runtimeSeconds: cut.runtimeSeconds,
-        runtimeSource: "jellyfin",
+        runtimeSource: "meta_egg",
         providerIds: {},
         imageUrl: null,
       },

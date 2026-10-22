@@ -8,6 +8,7 @@ export type MediaKind = z.infer<typeof mediaKindSchema>;
 
 export const runtimeSourceSchema = z.enum([
   "jellyfin",
+  "meta_egg",
   "manual",
   "omdb",
   "unknown",
@@ -262,8 +263,24 @@ export function formatTimestamp(totalSeconds: number): string {
     : `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-// Meta Egg's screening API keeps every transcript attached to a concrete cut.
+// Meta Egg attaches every transcript to a declared subtitle version or media source.
+const screeningSourceSchema = z.enum(["catalog", "jellyfin"]);
+const screeningPrecisionSchema = z.enum(["subtitle_version", "media_source"]);
+const screeningLinkSchema = z
+  .string()
+  .url()
+  .refine(
+    (value) => /^https?:\/\//.test(value),
+    "Expected an HTTP or HTTPS link",
+  );
+export const screeningProvenanceSchema = z.object({
+  sourceUrl: screeningLinkSchema,
+  licenseUrl: screeningLinkSchema,
+  attribution: z.string().min(1),
+});
 export const screeningMovieSchema = z.object({
+  provider: screeningSourceSchema,
+  provenance: screeningProvenanceSchema.optional(),
   id: z.string().min(1),
   title: z.string().min(1),
   year: z.number().int().nullable(),
@@ -282,7 +299,11 @@ export const screeningCutSchema = z.object({
   id: z.string().min(1),
   label: z.string(),
   runtimeSeconds: z.number().nonnegative().nullable(),
-  precision: z.literal("media_source"),
+  precision: screeningPrecisionSchema,
+  editionId: z.string().min(1).optional(),
+  referenceVideoUrl: screeningLinkSchema.nullable().optional(),
+  referenceVideoLabel: z.string().min(1).optional(),
+  matchingNotes: z.string().optional(),
   subtitles: z.array(screeningTrackSchema),
 });
 export const screeningMoviesSchema = z.object({
@@ -297,8 +318,9 @@ export const screeningTranscriptSchema = z.object({
     cutId: z.string(),
     trackId: z.string(),
     language: z.string().nullable(),
-    source: z.literal("jellyfin"),
-    precision: z.literal("media_source"),
+    source: screeningSourceSchema,
+    precision: screeningPrecisionSchema,
+    provenance: screeningProvenanceSchema.optional(),
     cues: z.array(
       subtitleCueSchema.refine((cue) => cue.endSeconds >= cue.startSeconds),
     ),

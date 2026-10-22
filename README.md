@@ -1,6 +1,6 @@
 # Introspect
 
-Introspect is a dim second-screen journal for films. Search Meta Egg, choose the matching cut and transcript, then anchor the subtitle clock to the film or follow a permitted Jellyfin device through Meta Egg. Beginning a note holds the dialogue and timestamp while the film keeps moving; saving returns immediately to live subtitles.
+Introspect is a dim second-screen journal for films. Search Meta Egg, choose the matching cut and transcript, then anchor the subtitle clock to the film playing in a cinema, on a friend's screen, or in any player. Jellyfin following is an optional mode for Jellyfin-backed catalog entries. Beginning a note holds the dialogue and timestamp while the film keeps moving; saving returns immediately to live subtitles.
 
 This Bun workspace contains a React/Vite web app, a Hono API, shared Zod contracts, and SQLite storage. See the [user guide](USER_DOC.md#capability-index) for supported capabilities, workflows, and restrictions.
 
@@ -13,7 +13,7 @@ cp .env.example .env
 bun install --frozen-lockfile
 ```
 
-Edit `.env` before starting. Set `META_EGG_URL` to your private Meta Egg API, configured with the library and scoped Jellyfin user. The Live workflow needs Meta Egg's `/v1/screening` API. Direct Jellyfin, Bazarr and OMDb settings are optional legacy integrations; they are not required for screening notes. Reuse an existing `.env` instead of overwriting it.
+Edit `.env` before starting. Set `META_EGG_URL` to your private Meta Egg API with a standalone screening catalog. The initial licensed pilot contains one film, **Sintel**; more films require metadata and a matching transcript version added to Meta Egg. No Jellyfin credential is needed for this workflow. The Live workflow needs Meta Egg's `/v1/screening` API. Direct Jellyfin, Bazarr and OMDb settings are optional legacy integrations; they are not required for screening notes. Reuse an existing `.env` instead of overwriting it.
 
 ```bash
 bun dev

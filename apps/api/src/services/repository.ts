@@ -127,12 +127,13 @@ export async function resolveMedia(
       ? existing.runtimeSource
       : incoming.runtimeSeconds == null
         ? existing.runtimeSource
-        : "jellyfin";
+        : incoming.runtimeSource;
     const lastSeenAge = now.getTime() - existing.lastSeenAt.getTime();
     const metadataChanged =
       existing.title !== incoming.title ||
       existing.contextTitle !== incoming.contextTitle ||
       existing.runtimeSeconds !== runtimeSeconds ||
+      existing.runtimeSource !== runtimeSource ||
       existing.providerIdsJson !== JSON.stringify(incoming.providerIds);
 
     if (metadataChanged || lastSeenAge > 60_000) {
@@ -180,7 +181,8 @@ export async function resolveMedia(
       seasonNumber: incoming.seasonNumber,
       episodeNumber: incoming.episodeNumber,
       runtimeSeconds: incoming.runtimeSeconds,
-      runtimeSource: incoming.runtimeSeconds == null ? "unknown" : "jellyfin",
+      runtimeSource:
+        incoming.runtimeSeconds == null ? "unknown" : incoming.runtimeSource,
       jellyfinRuntimeSeconds: incoming.runtimeSeconds,
       providerIdsJson: JSON.stringify(incoming.providerIds),
       lastSeenAt: now,
@@ -269,7 +271,9 @@ export async function updateRuntime(
         input.runtimeSeconds == null
           ? existing.jellyfinRuntimeSeconds == null
             ? "unknown"
-            : "jellyfin"
+            : existing.jellyfinServerKey.startsWith("meta-egg:")
+              ? "meta_egg"
+              : "jellyfin"
           : (input.source ?? "manual"),
       ...(input.editionLabel !== undefined
         ? { editionLabel: input.editionLabel }

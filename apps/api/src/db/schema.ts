@@ -118,7 +118,7 @@ export const mediaItems = sqliteTable(
     episodeNumber: integer("episode_number"),
     runtimeSeconds: integer("runtime_seconds"),
     runtimeSource: text("runtime_source", {
-      enum: ["jellyfin", "manual", "omdb", "unknown"],
+      enum: ["jellyfin", "meta_egg", "manual", "omdb", "unknown"],
     })
       .default("unknown")
       .notNull(),

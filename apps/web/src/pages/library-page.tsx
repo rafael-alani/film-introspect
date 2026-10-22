@@ -154,7 +154,7 @@ export function LibraryPage() {
           <Text className="eyebrow">YOUR COLLECTION</Text>
           <Title order={1}>Film journal</Title>
           <Text c="dimmed" mt={6}>
-            Every title that has made you pause and write.
+            Thoughts you caught while the film kept moving.
           </Text>
         </div>
         <Paper className="library-stat" radius="lg">

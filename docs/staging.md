@@ -8,8 +8,9 @@ every two minutes, then builds the API and frontend from that exact commit.
 
 The screening candidate requires `META_EGG_URL` to point to the private Meta Egg
 screening API, `DEMO_MODE=false`, and the application's local single-user profile
-or configured accounts. Jellyfin access belongs to Meta Egg's explicitly scoped
-integration; Film Introspect needs no direct Jellyfin/Bazarr credentials or media
+or configured accounts. The standalone catalog includes the licensed Sintel pilot and needs no Jellyfin
+service. Other films require a matching transcript version added to Meta Egg. Optional
+Jellyfin access belongs to Meta Egg's explicitly scoped integration; Film Introspect needs no direct Jellyfin/Bazarr credentials or media
 mounts for this workflow. The old demo-only deployment cannot test this candidate.
 SQLite notes/settings persist across successful branch deployments.
 

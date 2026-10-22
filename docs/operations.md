@@ -35,11 +35,11 @@ Configure Bazarr's Jellyfin integration and metadata refresh in Bazarr itself. I
 
 ## Meta Egg screening contract
 
-Configure `META_EGG_URL` with a private, reachable Meta Egg service exposing `/v1/screening/movies`, movie detail, cut-specific transcripts and scoped sessions. Introspect needs no media filesystem mount and no Jellyfin credential for this path. Meta Egg's deployment owns its library endpoint, read credentials and permitted user. Do not expose Meta Egg's unauthenticated API publicly.
+Configure `META_EGG_URL` with a private, reachable Meta Egg standalone catalog service exposing `/v1/screening/movies`, movie detail, cut-specific transcripts and scoped sessions. Introspect needs no media filesystem mount and no Jellyfin credential for this path. Meta Egg's deployment owns its catalog manifest and matching transcript files. The initial catalog contains the licensed **Sintel** pilot; adding other films requires their metadata, a declared subtitle version and matching transcript source. No Jellyfin service is required. If the optional Jellyfin provider is used, its endpoint, read credentials and permitted user also belong to Meta Egg's deployment. Do not expose Meta Egg's unauthenticated API publicly.
 
 The Compose API keeps notes in `/data/introspect.db` on `introspect_data`; the web service exposes port 80 through `WEB_PORT`, and `/api/health` is the liveness probe. Deployment assignments may replace the named volume with a scoped host bind mount. API health is not evidence that Meta Egg, a transcript or a screening is usable.
 
-A missing or unavailable Meta Egg connection is shown in Live. Bitmap-only subtitles need a text track; no OCR, download job, fake demo transcript, or alternate cut is used as fallback. Keep server and client clocks synchronized for automatic session freshness checks. Scope the Meta Egg user before testing automatic playback.
+A missing or unavailable Meta Egg connection is shown in Live. Bitmap-only subtitles need a text track; no OCR, download job, fake demo transcript, or alternate cut is used as fallback. Keep server and client clocks synchronized for automatic session freshness checks. Scope the Meta Egg user before testing optional Jellyfin playback.
 
 ## Authentication and access
 
@@ -126,7 +126,7 @@ Rehearse into a separate deployment before replacing working data. The following
 4. Start it with `docker compose --env-file "$restore_env" -p introspect-restore up -d`. Check logs, API health, sign-in (if enabled), preferences, timeline counts, and known notes. For Live validation, use the original `JELLYFIN_URL`, account, item, and media source to preserve [timeline identity](architecture.md#timeline-and-runtime-rules). If that server is unavailable, [inspect restored notes through the API](#inspect-restored-notes-without-playback); demo playback cannot validate an existing Jellyfin timeline.
 5. Record the result before considering the backup verified. For production recovery, stop access/writers, preserve the current data separately, and restore into an empty replacement volume using the same sequence and matching application revision. Recheck the public URL, credentials, and data before reopening access.
 
-Starting a newer revision may migrate the restored database. Preserve an untouched backup first. There is no supported down-migration command; rolling back code alone does not undo schema or data changes. A successful health request alone is not evidence that notes, authentication, or a recovery succeeded.
+Starting a newer revision may migrate the restored database. Preserve an untouched backup first. There is no supported down-migration command; rolling back code alone does not undo schema or data changes. The new `meta_egg` runtime-source value uses the existing SQLite TEXT column and requires no SQL migration, but older releases may reject that value. Roll back with the retained prior database generation, rather than pointing an old app at a newer database. A successful health request alone is not evidence that notes, authentication, or a recovery succeeded.
 
 ### Inspect restored notes without playback
 

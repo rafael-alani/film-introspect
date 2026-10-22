@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Button,
   Group,
@@ -180,7 +181,7 @@ export function LivePage() {
         <div>
           <Title order={1}>Keep watching.</Title>
           <Text c="dimmed" mt="sm">
-            Find your film. Catch a thought without stopping the screening.
+            Watch on any screen. Catch a thought without stopping the film.
           </Text>
         </div>
       </header>
@@ -209,6 +210,12 @@ export function LivePage() {
           Search films
         </Button>
       </form>
+      {!query && (
+        <Text c="dimmed" mt="lg">
+          Search Meta Egg's available catalog. A matching subtitle version is
+          needed for the film on screen.
+        </Text>
+      )}
       {movies.isLoading && <Loader mt="xl" aria-label="Loading films" />}
       {movies.isError && (
         <Text role="alert" className="form-error" mt="lg">
@@ -220,8 +227,8 @@ export function LivePage() {
       )}
       {movies.data?.data.length === 0 && (
         <Text c="dimmed" mt="xl">
-          No films found. Try another title, or add this film to Meta Egg's
-          connected library.
+          No matching film is available yet. Its metadata and a matching
+          transcript need to be added to Meta Egg's catalog.
         </Text>
       )}
       <div className="screening-results">
@@ -269,7 +276,7 @@ export function LivePage() {
                 </Text>
               )}
               <Select
-                label="Cut / media version"
+                label="Cut / subtitle version"
                 placeholder="Choose the version you are watching"
                 value={selectedCut?.id ?? null}
                 onChange={setCutId}
@@ -284,7 +291,7 @@ export function LivePage() {
               </Text>
               {cuts.length === 0 && (
                 <Text className="form-error">
-                  Meta Egg has no playable media version for this film.
+                  Meta Egg has no declared subtitle version for this film.
                 </Text>
               )}
               <Button
@@ -357,7 +364,7 @@ function Screening({
   const sessions = useQuery({
     queryKey: ["screening-sessions", movie.id],
     queryFn: () => api.screeningSessions(movie.id),
-    enabled: mode === "jellyfin",
+    enabled: movie.provider === "jellyfin" && mode === "jellyfin",
     refetchInterval: 2000,
     retry: 1,
   });
@@ -380,6 +387,7 @@ function Screening({
   );
   const displayPosition = notePosition(position, draftPosition);
   const cues = transcript.data?.data.cues ?? [];
+  const provenance = transcript.data?.data.provenance ?? movie.provenance;
   const visibleCues = cueWindow(cues, displayPosition);
   const stale =
     mode === "jellyfin" &&
@@ -504,29 +512,54 @@ function Screening({
           Change film
         </Button>
       </header>
+      {cut.referenceVideoUrl && (
+        <Text size="sm" mb="md">
+          <Anchor
+            href={cut.referenceVideoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {cut.referenceVideoLabel ?? "Watch reference film"}
+          </Anchor>{" "}
+          · opens separately; keep Introspect on your second screen.
+        </Text>
+      )}
+      {cut.matchingNotes && (
+        <Text size="sm" c="dimmed" mb="md">
+          {cut.matchingNotes}
+        </Text>
+      )}
       <details
         className="screening-sync"
         open={!anchor.running && !selectedSession}
       >
         <summary>Sync with the screen</summary>
         <Stack gap="md" mt="md">
-          <Select
-            label="Screening clock"
-            data={[
-              { value: "manual", label: "External screen — set the clock" },
-              {
-                value: "jellyfin",
-                label: "Follow a Jellyfin device via Meta Egg",
-              },
-            ]}
-            value={mode}
-            disabled={draftPosition !== null}
-            onChange={(value) => {
-              setMode(value ?? "manual");
-              setAnchor({ position, at: performance.now(), running: false });
-              setOffset(0);
-            }}
-          />
+          {movie.provider === "jellyfin" ? (
+            <Select
+              label="Screening clock"
+              data={[
+                { value: "manual", label: "External screen — set the clock" },
+                {
+                  value: "jellyfin",
+                  label: "Follow a Jellyfin device via Meta Egg",
+                },
+              ]}
+              value={mode}
+              disabled={draftPosition !== null}
+              onChange={(value) => {
+                setMode(value ?? "manual");
+                setAnchor({ position, at: performance.now(), running: false });
+                setOffset(0);
+              }}
+            />
+          ) : (
+            <Text size="sm" c="dimmed">
+              Use the clock or a line of dialogue to align with a cinema, a
+              friend's screen, or any player. Introspect does not connect to or
+              control that screen.
+            </Text>
+          )}
           {mode === "manual" ? (
             <>
               <form
@@ -726,7 +759,7 @@ function Screening({
                   ? errorMessage(transcript.error)
                   : transcript.isFetching
                     ? "Loading this cut's transcript…"
-                    : "No text transcript is available for this cut. Add a matching SRT/VTT or text track to the connected library."}
+                    : "No text transcript is available for this cut. Add a matching transcript to Meta Egg."}
               </Text>
             )}
             {transcript.isError && (
@@ -742,8 +775,33 @@ function Screening({
           <Text className="subtitle-source">
             Meta Egg ·{" "}
             {transcript.data?.data.language?.toUpperCase() ?? "text track"} ·
-            matched to this media version
+            {cut.precision === "subtitle_version"
+              ? "declared subtitle version · verify alignment"
+              : "matched to this media version"}
           </Text>
+          {provenance && (
+            <Text size="xs" c="dimmed" mt="sm">
+              {provenance.attribution}
+              {" · "}
+              <Anchor
+                size="xs"
+                href={provenance.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Source
+              </Anchor>
+              {" · "}
+              <Anchor
+                size="xs"
+                href={provenance.licenseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                License
+              </Anchor>
+            </Text>
+          )}
         </Paper>
         <Paper className="composer-panel" radius="lg">
           <div className="panel-heading">

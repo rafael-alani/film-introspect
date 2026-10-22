@@ -1,6 +1,6 @@
 # Using Introspect
 
-This guide describes the candidate screening MVP. Actual cinema alignment and permitted Jellyfin playback still need live verification. See [verification](docs/development.md#verification).
+This guide describes the candidate screening MVP. It is designed for a cinema, a friend's screen, or any player. Initial catalog coverage is one licensed film, **Sintel**; more titles need metadata and a matching transcript version configured in Meta Egg. See [verification](docs/development.md#verification).
 
 ## Capability index
 
@@ -28,16 +28,16 @@ These are Introspect accounts, not Jellyfin accounts. Enabling authentication do
 
 ## Follow playback
 
-1. On **Live**, search for a film in Meta Egg. Search requires a title; results come from its connected library.
-2. Select the movie and the **Cut / media version** you are watching, then **Open screening**. A version's runtime helps identify it; an unlabeled file is not proof of a theatrical or director's cut. Different cuts retain separate notes and subtitle timing.
-3. Select an available **Subtitle track**. Only native text subtitles are supported. If the version has image subtitles or none, add matching SRT/VTT or a text track through the library's existing workflow. Introspect cannot OCR or create missing transcripts.
-4. Open **Sync with the screen** and choose one of the clocks below.
+1. On **Live**, search for a film in Meta Egg. Search requires a title; results come from Meta Egg's configured catalog, not a universal movie/subtitle database. The initial pilot search is **Sintel**.
+2. Select the movie and the **Cut / subtitle version** you are watching, then **Open screening**. A version's runtime helps identify it; an unlabeled file is not proof of a theatrical or director's cut. Different cuts retain separate notes and subtitle timing.
+3. Select an available **Subtitle track**. Only text subtitles are supported. If a film or matching version is missing, add its metadata and matching SRT/VTT through Meta Egg's catalog configuration. Introspect cannot OCR or create missing transcripts.
+4. Open **Sync with the screen** and align with the film on your other screen. A supplied **Watch reference film** link opens the matching licensed video separately; it is optional and Introspect does not control it. Source attribution and license links come from Meta Egg.
 
-For a cinema, screening room, or any external player, use **External screen — set the clock**. Enter the film's current time as `mm:ss` or `h:mm:ss`, then tap **Sync now** at that moment. At the start, enter `0:00` and tap when the film begins. Alternatively, expand **Sync to a line of dialogue**, search for a line, and tap it when it starts on screen. Use **−0.5 s** or **+0.5 s** to correct drift. Keep the page open; reopening it requires another timing anchor.
+For the standalone catalog, the external-screen clock is the only mode. Enter the film's current time as `mm:ss` or `h:mm:ss`, then tap **Sync now** at that moment. At the start, enter `0:00` and tap when the film begins. Alternatively, expand **Sync to a line of dialogue**, search for a line, and tap it when it starts on screen. Use **−0.5 s** or **+0.5 s** to correct drift. Keep the page open; reopening it requires another timing anchor.
 
-For supported home playback, choose **Follow a Jellyfin device via Meta Egg** and select a device playing the exact same item and media source. Meta Egg scopes visibility to its configured Jellyfin user. A different user's player or a player without media-source identity is not eligible. Introspect observes play, pause and seek; it never controls the movie. **Sync unavailable** means timing is currently an estimate. Reconnect or switch to a manual anchor before starting another note.
+Only catalog entries supplied by the optional Jellyfin provider expose **Follow a Jellyfin device via Meta Egg** and select a device playing the exact same item and media source. Meta Egg scopes visibility to its configured Jellyfin user. A different user's player or a player without media-source identity is not eligible. Introspect observes play, pause and seek; it never controls the movie. **Sync unavailable** means timing is currently an estimate. Reconnect or switch to a manual anchor before starting another note.
 
-A matching cut and a good timing anchor are required. This MVP has no microphone/audio recognition, and network/player latency can affect the Jellyfin clock. Check the first few lines against the screen and correct the clock; frame-accurate synchronization is not claimed.
+A declared subtitle version identifies the timing source; it does not automatically identify the film print or cut on your screen. Follow the version's matching notes, verify several spoken lines, and correct the anchor if needed. A matching cut and a good timing anchor are required. This MVP has no microphone/audio recognition, and network/player latency can affect the Jellyfin clock. Check the first few lines against the screen and correct the clock; frame-accurate synchronization is not claimed.
 
 ## Read subtitles
 
