@@ -1838,3 +1838,17 @@ a:focus-visible {
     gap: 4px;
   }
 }
+
+/* Keep the Settings action readable when the heading wraps on a phone. */
+.settings-page .page-heading {
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.settings-page .page-heading > button {
+  flex-shrink: 0;
+}
+
+.settings-page .page-heading > button .mantine-Button-label {
+  max-width: none;
+}
