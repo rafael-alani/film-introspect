@@ -1,5 +1,6 @@
 import {
   screeningSelectionSchema,
+  personalJellyfinInputSchema,
   appConfigSchema,
   connectionsResponseSchema,
   createNoteInputSchema,
@@ -18,6 +19,13 @@ import {
   updateUserSettingsSchema,
   userSettingsSchema,
 } from "@film-introspect/contracts";
+import type { Context } from "hono";
+import {
+  jellyfinContext,
+  jellyfinSummary,
+  saveJellyfin,
+  removeJellyfin,
+} from "./services/jellyfin-settings";
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -120,6 +128,65 @@ api.use("*", async (c, next) => {
   await next();
 });
 
+api.use("/settings/jellyfin", async (c, next) => {
+  c.header("Cache-Control", "no-store");
+  if (
+    c.req.method !== "GET" &&
+    c.req.header("Origin") &&
+    c.req.header("Origin") !== env.WEB_ORIGIN
+  )
+    return errorResponse(
+      c,
+      403,
+      "INVALID_ORIGIN",
+      "Open Settings from Introspect to change this connection.",
+    );
+  await next();
+});
+api.get("/settings/jellyfin", (c) =>
+  c.json(jellyfinSummary(c.get("authUser").id)),
+);
+api.post(
+  "/settings/jellyfin",
+  zValidator("json", personalJellyfinInputSchema, (result, c) => {
+    if (!result.success)
+      return errorResponse(
+        c,
+        400,
+        "INVALID_CONNECTION",
+        "Enter a valid Jellyfin server address and API key.",
+      );
+  }),
+  async (c) => {
+    const input = c.req.valid("json");
+    const { data } = await metaEgg.connection(input);
+    return c.json(
+      saveJellyfin(c.get("authUser").id, input, data.serverName, data.userId),
+    );
+  },
+);
+api.delete("/settings/jellyfin", (c) =>
+  c.json(removeJellyfin(c.get("authUser").id)),
+);
+api.get("/screening/status", async (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json(await metaEgg.status());
+});
+function screeningConnection(c: Context<AppContext>, selected?: string) {
+  const source = selected ?? c.req.query("source") ?? "external";
+  if (source === "external") return null;
+  if (source !== "jellyfin")
+    throw new MetaEggError("Choose Any screen or your Jellyfin server.");
+  const connection = jellyfinContext(c.get("authUser").id);
+  if (!connection)
+    throw new MetaEggError("Connect your Jellyfin server in Settings first.");
+  return connection;
+}
+api.use("/screening/*", async (c, next) => {
+  c.header("Cache-Control", "no-store");
+  await next();
+});
+
 api.get("/screening/movies", async (c) => {
   const query = (c.req.query("query") ?? "").trim();
   if (!query || query.length > 200)
@@ -129,10 +196,10 @@ api.get("/screening/movies", async (c) => {
       "INVALID_QUERY",
       "Enter a film title between 1 and 200 characters.",
     );
-  return c.json(await metaEgg.movies(query));
+  return c.json(await metaEgg.movies(query, screeningConnection(c)));
 });
 api.get("/screening/movies/:itemId", async (c) =>
-  c.json(await metaEgg.movie(c.req.param("itemId"))),
+  c.json(await metaEgg.movie(c.req.param("itemId"), screeningConnection(c))),
 );
 api.get("/screening/movies/:itemId/cuts/:cutId/subtitles/:index", async (c) => {
   const index = Number(c.req.param("index"));
@@ -143,6 +210,7 @@ api.get("/screening/movies/:itemId/cuts/:cutId/subtitles/:index", async (c) => {
       c.req.param("itemId"),
       c.req.param("cutId"),
       index,
+      screeningConnection(c),
     ),
   );
 });
@@ -150,7 +218,7 @@ api.get("/screening/sessions", async (c) => {
   const itemId = c.req.query("itemId");
   if (!itemId)
     return errorResponse(c, 400, "INVALID_ITEM", "Choose a film first.");
-  return c.json(await metaEgg.sessions(itemId));
+  return c.json(await metaEgg.sessions(itemId, screeningConnection(c)));
 });
 api.post(
   "/screening/timeline",
@@ -164,8 +232,9 @@ api.post(
       );
   }),
   async (c) => {
-    const { itemId, cutId } = c.req.valid("json");
-    const { data: movie } = await metaEgg.movie(itemId);
+    const { itemId, cutId, source } = c.req.valid("json");
+    const connection = screeningConnection(c, source);
+    const { data: movie } = await metaEgg.movie(itemId, connection);
     const cut = movie.cuts.find((entry) => entry.id === cutId);
     if (!cut)
       return errorResponse(
@@ -176,7 +245,9 @@ api.post(
       );
     const media = await resolveMedia(
       c.get("authUser").id,
-      `meta-egg:${env.META_EGG_URL?.replace(/\/$/, "")}`,
+      connection
+        ? `jellyfin:${connection.url}`
+        : `meta-egg:${env.META_EGG_URL?.replace(/\/$/, "")}`,
       {
         id: null,
         jellyfinItemId: movie.id,
@@ -189,7 +260,7 @@ api.post(
         seasonNumber: null,
         episodeNumber: null,
         runtimeSeconds: cut.runtimeSeconds,
-        runtimeSource: "meta_egg",
+        runtimeSource: connection ? "jellyfin" : "meta_egg",
         providerIds: {},
         imageUrl: null,
       },

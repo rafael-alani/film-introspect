@@ -89,7 +89,7 @@ test("rating migration preserves existing notes and preferences and is applied o
     expect(sqlite.query("PRAGMA foreign_key_check").all()).toEqual([]);
     expect(
       sqlite.query("SELECT count(*) AS count FROM __drizzle_migrations").get(),
-    ).toEqual({ count: 2 });
+    ).toEqual({ count: journal.entries.length });
     sqlite.run(
       "UPDATE notes SET rating = 10, body = '', color = 'orange' WHERE id = 'amber'",
     );

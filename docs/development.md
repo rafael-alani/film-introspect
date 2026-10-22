@@ -110,3 +110,5 @@ Staging acceptance must separately exercise a real Meta Egg catalog item, matchi
 ### Screening browser fixture — 2026-10-21
 
 A desktop browser walkthrough against the isolated synthetic fixture exercised film search, explicit cut selection, clock anchoring, focus-to-hold, continued live clock advancement, note save and subtitle catch-up. The saved timestamp uses the same whole second shown in the composer; the held cue still uses its precise fractional position. This is browser behavior evidence with test data, not a real film synchronization or Jellyfin integration check.
+
+Personal-connection coverage in `apps/api/src/services/personal-jellyfin.test.ts` uses an in-memory migrated SQLite database and mocked Meta Egg responses. It checks encryption/owner binding, independent users, secret-free responses, failed replacement preservation, outbound source isolation, URL validation, origin rejection and disconnect. It does not validate real Jellyfin credentials or device synchronization. The migration regression counts all applied migrations rather than assuming only the initial two.

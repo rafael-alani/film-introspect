@@ -37,7 +37,7 @@ With Meta Egg's private screening storage configured, selecting an online movie 
 
 For standalone catalog and online discovery entries, the external-screen clock is the only mode. Enter the film's current time as `mm:ss` or `h:mm:ss`, then tap **Sync now** at that moment. At the start, enter `0:00` and tap when the film begins. Alternatively, expand **Sync to a line of dialogue**, search for a line, and tap it when it starts on screen. Use **−0.5 s** or **+0.5 s** to correct drift. Keep the page open; reopening it requires another timing anchor.
 
-Only catalog entries supplied by the optional Jellyfin provider expose **Follow a Jellyfin device via Meta Egg** and select a device playing the exact same item and media source. Meta Egg scopes visibility to its configured Jellyfin user. A different user's player or a player without media-source identity is not eligible. Introspect observes play, pause and seek; it never controls the movie. **Sync unavailable** means timing is currently an estimate. Reconnect or switch to a manual anchor before starting another note.
+Connect your server in Settings, then select its name under **Where are you watching?**. The subtitle selection screen shows that server and its exact media versions. Jellyfin screenings start with **Follow a device**; select a device playing the exact same item and media source. A personal access token scopes visibility to its Jellyfin user; server API keys may see all permitted sessions. A different user's player or a player without media-source identity is not eligible. Introspect observes play, pause and seek; it never controls the movie. **Sync unavailable** means timing is currently an estimate. Reconnect or switch to a manual anchor before starting another note.
 
 A declared subtitle version identifies the timing source; it does not automatically identify the film print or cut on your screen. Follow the version's matching notes, verify several spoken lines, and correct the anchor if needed. A matching cut and a good timing anchor are required. This MVP has no microphone/audio recognition, and network/player latency can affect the Jellyfin clock. Check the first few lines against the screen and correct the clock; frame-accurate synchronization is not claimed.
 
@@ -90,7 +90,7 @@ Apply this film scale to individual moments, too:
 | 2     | Horrible               |                                                                                                                |
 | 1     | Crime against humanity |                                                                                                                |
 
-Changing films or cuts cannot move a note draft to another timeline. Timeline identity includes your Introspect profile, configured Meta Egg server, film ID, and cut ID. The older direct-Jellyfin timelines remain separate and are not automatically merged with Meta Egg timelines.
+Changing films or cuts cannot move a note draft to another timeline. Timeline identity includes your Introspect profile, selected Jellyfin server (or configured Meta Egg service for external screenings), film ID, and cut ID. The older direct-Jellyfin timelines remain separate and are not automatically merged with Meta Egg timelines.
 
 ## Browse the library
 
@@ -127,13 +127,15 @@ In **Settings → Reading window**, change the fields and select **Save preferen
 | Keep after                  | 12 seconds       | Whole seconds, 1–120                                                      |
 | Default note color          | Yellow — Insight | Yellow, red, green, blue, purple, orange                                  |
 
-The reading window highlights a note from its timestamp minus **Show before** until its timestamp plus **Keep after**. It does not hide other notes or change timestamps. Server addresses, keys, polling intervals, and authentication are operator settings, not editable here.
+The reading window highlights a note from its timestamp minus **Show before** until its timestamp plus **Keep after**. It does not hide other notes or change timestamps. Jellyfin server addresses and credentials are editable in Settings. Shared service setup is managed by the operator.
 
 ## Check connections
 
-These Settings checks cover legacy direct integrations. To check the screening integration, use **Live** to search a real Meta Egg film and load its selected cut/transcript.
+In **Settings → Your Jellyfin server**, enter the server address and an API key or personal access token, then choose **Test and save connection**. The server name appears after validation. Enter a replacement key to update the connection; a failed test keeps the saved connection. **Disconnect** removes the saved key and keeps your notes in Library. Saved keys are never displayed. With sign-in enabled each Introspect account has its own connection; the login-disabled Local viewer is one shared profile.
 
-Open **Settings → Your media stack** and select **Check services**. Jellyfin and Bazarr checks contact those servers. OMDb's **Connected** badge only means a key is configured; **Look up** in the runtime dialog is the actual request. Bazarr being connected does not prove that a subtitle has been downloaded or indexed by Jellyfin.
+Choose **Any screen** in Live for the usual subtitle-release lookup and manual clock. Choose the saved server name for exact media versions, server subtitles and device playback following. Changing servers creates separate note timelines even when item IDs match. Connecting Jellyfin never changes playback or downloads media.
+
+**Settings → OpenSubtitles** shows whether the shared API key is configured. **Check services** refreshes that status; it does not prove the key works or that quota remains. A real subtitle lookup checks availability. The service operator manages this key for all viewers.
 
 The **API status** link checks Introspect's HTTP endpoint. It does not test playback, the database contents, or upstream integrations. See [operations](docs/operations.md) for configuration and failure recovery.
 

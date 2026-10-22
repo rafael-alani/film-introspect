@@ -46,7 +46,7 @@ function mediaRowToContract(row: MediaRow): Media {
     runtimeSeconds: row.runtimeSeconds,
     runtimeSource: row.runtimeSource,
     providerIds: safeProviderIds(row.providerIdsJson),
-    imageUrl: row.jellyfinServerKey.startsWith("meta-egg:")
+    imageUrl: /^(meta-egg|jellyfin):/.test(row.jellyfinServerKey)
       ? null
       : `/api/media/${encodeURIComponent(row.jellyfinItemId)}/image`,
   };

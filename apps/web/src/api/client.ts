@@ -1,4 +1,8 @@
 import {
+  personalJellyfinSchema,
+  screeningServiceStatusSchema,
+  type PersonalJellyfinInput,
+  type ScreeningSource,
   screeningMoviesSchema,
   screeningMovieDetailSchema,
   screeningTranscriptSchema,
@@ -141,30 +145,52 @@ function body(value: unknown): string {
 }
 
 export const api = {
-  screeningMovies: (query: string) =>
+  jellyfinSettings: () =>
+    request("/api/settings/jellyfin", personalJellyfinSchema),
+  saveJellyfin: (input: PersonalJellyfinInput) =>
+    request("/api/settings/jellyfin", personalJellyfinSchema, {
+      method: "POST",
+      body: body(input),
+    }),
+  removeJellyfin: () =>
+    request("/api/settings/jellyfin", personalJellyfinSchema, {
+      method: "DELETE",
+    }),
+  screeningStatus: () =>
+    request("/api/screening/status", screeningServiceStatusSchema),
+  screeningMovies: (query: string, source: ScreeningSource = "external") =>
     request(
-      `/api/screening/movies?query=${encodeURIComponent(query)}`,
+      `/api/screening/movies?query=${encodeURIComponent(query)}&source=${source}`,
       screeningMoviesSchema,
     ),
-  screeningMovie: (id: string) =>
+  screeningMovie: (id: string, source: ScreeningSource = "external") =>
     request(
-      `/api/screening/movies/${encodeURIComponent(id)}`,
+      `/api/screening/movies/${encodeURIComponent(id)}?source=${source}`,
       screeningMovieDetailSchema,
     ),
-  screeningTranscript: (item: string, cut: string, index: number) =>
+  screeningTranscript: (
+    item: string,
+    cut: string,
+    index: number,
+    source: ScreeningSource = "external",
+  ) =>
     request(
-      `/api/screening/movies/${encodeURIComponent(item)}/cuts/${encodeURIComponent(cut)}/subtitles/${index}`,
+      `/api/screening/movies/${encodeURIComponent(item)}/cuts/${encodeURIComponent(cut)}/subtitles/${index}?source=${source}`,
       screeningTranscriptSchema,
     ),
-  screeningSessions: (itemId: string) =>
+  screeningSessions: (itemId: string, source: ScreeningSource = "external") =>
     request(
-      `/api/screening/sessions?itemId=${encodeURIComponent(itemId)}`,
+      `/api/screening/sessions?itemId=${encodeURIComponent(itemId)}&source=${source}`,
       screeningSessionsSchema,
     ),
-  screeningTimeline: (itemId: string, cutId: string) =>
+  screeningTimeline: (
+    itemId: string,
+    cutId: string,
+    source: ScreeningSource = "external",
+  ) =>
     request("/api/screening/timeline", mediaSchema, {
       method: "POST",
-      body: body({ itemId, cutId }),
+      body: body({ itemId, cutId, source }),
     }),
   config: (): Promise<AppConfig> => request("/api/config", appConfigSchema),
   playback: (): Promise<PlaybackSnapshot> =>

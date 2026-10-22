@@ -180,6 +180,11 @@ function TimedNote({
 }
 
 export function LivePage() {
+  const jellyfin = useQuery({
+    queryKey: ["jellyfin-settings"],
+    queryFn: api.jellyfinSettings,
+  });
+  const [source, setSource] = useState<"external" | "jellyfin">("external");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [movieId, setMovieId] = useState<string | null>(null);
@@ -189,14 +194,14 @@ export function LivePage() {
     cut: ScreeningCut;
   } | null>(null);
   const movies = useQuery({
-    queryKey: ["screening-movies", query],
-    queryFn: () => api.screeningMovies(query),
+    queryKey: ["screening-movies", source, jellyfin.data?.url, query],
+    queryFn: () => api.screeningMovies(query, source),
     enabled: query.length > 0,
     retry: 1,
   });
   const movie = useQuery({
-    queryKey: ["screening-movie", movieId],
-    queryFn: () => api.screeningMovie(movieId!),
+    queryKey: ["screening-movie", source, jellyfin.data?.url, movieId],
+    queryFn: () => api.screeningMovie(movieId!, source),
     enabled: !!movieId,
     retry: 1,
   });
@@ -216,6 +221,16 @@ export function LivePage() {
       <Screening
         key={`${screening.movie.id}:${screening.cut.id}`}
         {...screening}
+        serverName={
+          source === "jellyfin"
+            ? (jellyfin.data?.serverName ?? "Jellyfin")
+            : null
+        }
+        sourceKey={
+          source === "jellyfin"
+            ? (jellyfin.data?.url ?? "jellyfin")
+            : "external"
+        }
         onLeave={() => setScreening(null)}
       />
     );
@@ -230,6 +245,40 @@ export function LivePage() {
           </Text>
         </div>
       </header>
+      <Stack gap="xs" mb="lg">
+        <Select
+          label="Where are you watching?"
+          value={source}
+          allowDeselect={false}
+          data={[
+            {
+              value: "external",
+              label: "Any screen · cinema or another player",
+            },
+            ...(jellyfin.data?.configured
+              ? [
+                  {
+                    value: "jellyfin",
+                    label: jellyfin.data.serverName ?? "Jellyfin",
+                  },
+                ]
+              : []),
+          ]}
+          onChange={(value) => {
+            setSource(value === "jellyfin" ? "jellyfin" : "external");
+            setMovieId(null);
+            setCutId(null);
+          }}
+        />
+        <Text size="sm" c="dimmed">
+          {source === "jellyfin"
+            ? `Browse ${jellyfin.data?.serverName ?? "Jellyfin"}. Subtitles come from your selected media version; playback can follow your device.`
+            : "Find a matching subtitle release and align it with the film on screen."}{" "}
+          {!jellyfin.data?.configured && (
+            <a href="/settings">Connect Jellyfin in Settings</a>
+          )}
+        </Text>
+      </Stack>
       <form
         className="screening-search"
         onSubmit={(event) => {
@@ -314,6 +363,11 @@ export function LivePage() {
       {selectedMovie && (
         <section className="screening-selection" aria-label="Choose your cut">
           <Title order={2}>{detail?.title ?? selectedMovie.title}</Title>
+          <Text size="sm" mt="sm">
+            {source === "jellyfin"
+              ? `From ${jellyfin.data?.serverName ?? "Jellyfin"} · exact media versions · device sync option`
+              : "Any screen · choose a subtitle version and align manually"}
+          </Text>
           {(detail?.overview ?? selectedMovie.overview) && (
             <Text c="dimmed" maw="65ch" mt="sm">
               {detail?.overview ?? selectedMovie.overview}
@@ -353,7 +407,11 @@ export function LivePage() {
                   </Text>
                 )}
               <Select
-                label="Cut / subtitle version"
+                label={
+                  source === "jellyfin"
+                    ? "Media version on your server"
+                    : "Cut / subtitle version"
+                }
                 placeholder="Choose the version you are watching"
                 value={selectedCut?.id ?? null}
                 onChange={setCutId}
@@ -402,10 +460,14 @@ function Screening({
   movie,
   cut,
   onLeave,
+  serverName,
+  sourceKey,
 }: {
   movie: ScreeningMovie;
   cut: ScreeningCut;
   onLeave: () => void;
+  serverName: string | null;
+  sourceKey: string;
 }) {
   const queryClient = useQueryClient();
   const [trackIndex, setTrackIndex] = useState<string | null>(() => {
@@ -417,7 +479,10 @@ function Screening({
       )?.index ?? "",
     );
   });
-  const [mode, setMode] = useState("manual");
+  const source = movie.provider === "jellyfin" ? "jellyfin" : "external";
+  const [mode, setMode] = useState(
+    movie.provider === "jellyfin" ? "jellyfin" : "manual",
+  );
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<ClockAnchor>({
     position: 0,
@@ -440,22 +505,22 @@ function Screening({
   const [feedback, setFeedback] = useState<string | null>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const timeline = useQuery({
-    queryKey: ["screening-timeline", movie.id, cut.id],
-    queryFn: () => api.screeningTimeline(movie.id, cut.id),
+    queryKey: ["screening-timeline", sourceKey, movie.id, cut.id],
+    queryFn: () => api.screeningTimeline(movie.id, cut.id, source),
     retry: 1,
   });
   const mediaId = timeline.data?.id;
   const transcript = useQuery({
-    queryKey: ["screening-transcript", movie.id, cut.id, trackIndex],
+    queryKey: ["screening-transcript", sourceKey, movie.id, cut.id, trackIndex],
     queryFn: () =>
-      api.screeningTranscript(movie.id, cut.id, Number(trackIndex)),
+      api.screeningTranscript(movie.id, cut.id, Number(trackIndex), source),
     enabled: trackIndex !== null && trackIndex !== "",
     retry: 1,
     staleTime: 60_000,
   });
   const sessions = useQuery({
-    queryKey: ["screening-sessions", movie.id],
-    queryFn: () => api.screeningSessions(movie.id),
+    queryKey: ["screening-sessions", sourceKey, movie.id],
+    queryFn: () => api.screeningSessions(movie.id, source),
     enabled: movie.provider === "jellyfin" && mode === "jellyfin",
     refetchInterval: 2000,
     retry: 1,
@@ -598,6 +663,7 @@ function Screening({
           <Title order={1}>{movie.title}</Title>
           <Text c="dimmed" size="sm">
             {[
+              serverName,
               movie.year,
               cut.label,
               runtime ? `${Math.round(runtime / 60)} min` : null,
@@ -653,7 +719,7 @@ function Screening({
                 { value: "manual", label: "External screen — set the clock" },
                 {
                   value: "jellyfin",
-                  label: "Follow a Jellyfin device via Meta Egg",
+                  label: `Follow a device on ${serverName ?? "Jellyfin"}`,
                 },
               ]}
               value={mode}

@@ -5,86 +5,24 @@ import {
   Group,
   NumberInput,
   Paper,
-  Radio,
+  TextInput,
+  PasswordInput,
   Select,
-  Skeleton,
   Stack,
   Text,
   Title,
 } from "@mantine/core";
 import {
   IconCheck,
-  IconDatabase,
-  IconDeviceTv,
   IconExternalLink,
-  IconKey,
   IconLogout,
   IconRefresh,
-  IconServer,
 } from "@tabler/icons-react";
-import {
-  noteColors,
-  type ConnectionStatus,
-  type NoteColor,
-} from "@film-introspect/contracts";
+import { noteColors, type NoteColor } from "@film-introspect/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
 import { authClient } from "../api/auth";
 import { api, apiBaseUrl, errorMessage } from "../api/client";
-
-const services = [
-  {
-    id: "jellyfin",
-    title: "Jellyfin",
-    detail: "Playback & media",
-    icon: IconDeviceTv,
-  },
-  {
-    id: "bazarr",
-    title: "Bazarr",
-    detail: "Subtitle management",
-    icon: IconServer,
-  },
-  { id: "omdb", title: "OMDb", detail: "Runtime fallback", icon: IconDatabase },
-] as const;
-
-function ConnectionCard({
-  definition,
-  status,
-}: {
-  definition: (typeof services)[number];
-  status?: ConnectionStatus;
-}) {
-  const Icon = definition.icon;
-  const configured = status?.configured ?? false;
-  const connected = status?.connected ?? false;
-  return (
-    <Paper className="connection-card" radius="xl">
-      <div className="connection-service-icon">
-        <Icon size={21} stroke={1.5} />
-      </div>
-      <div className="connection-service-copy">
-        <Group gap="xs" wrap="nowrap">
-          <Text fw={700}>{status?.label || definition.title}</Text>
-          {status?.version && (
-            <Text size="xs" c="dimmed">
-              {status.version}
-            </Text>
-          )}
-        </Group>
-        <Text size="xs" c="dimmed">
-          {status?.message || definition.detail}
-        </Text>
-      </div>
-      <Badge
-        variant="light"
-        color={connected ? "green" : configured ? "yellow" : "gray"}
-      >
-        {connected ? "Connected" : configured ? "Unavailable" : "Not set"}
-      </Badge>
-    </Paper>
-  );
-}
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
@@ -94,14 +32,49 @@ export function SettingsPage() {
     staleTime: Infinity,
   });
   const session = authClient.useSession();
-  const connections = useQuery({
-    queryKey: ["connections"],
-    queryFn: api.connections,
-    refetchInterval: 60_000,
+  const jellyfin = useQuery({
+    queryKey: ["jellyfin-settings"],
+    queryFn: api.jellyfinSettings,
   });
-  const sessions = useQuery({
-    queryKey: ["playback-sessions"],
-    queryFn: api.sessions,
+  const sourceStatus = useQuery({
+    queryKey: ["screening-status"],
+    queryFn: api.screeningStatus,
+  });
+  const [serverUrl, setServerUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [connectionFeedback, setConnectionFeedback] = useState<string | null>(
+    null,
+  );
+  useEffect(() => {
+    if (jellyfin.data) setServerUrl(jellyfin.data.url ?? "");
+  }, [jellyfin.data]);
+  const connectionSaved = async () => {
+    setApiKey("");
+    await queryClient.invalidateQueries({ queryKey: ["jellyfin-settings"] });
+    queryClient.removeQueries({
+      predicate: (query) => String(query.queryKey[0]).startsWith("screening-"),
+    });
+  };
+  const saveConnection = useMutation({
+    mutationFn: () => api.saveJellyfin({ url: serverUrl, apiKey }),
+    onSuccess: async (result) => {
+      setConnectionFeedback(`Connected to ${result.serverName}.`);
+      await connectionSaved();
+    },
+    onError: (cause) => {
+      setApiKey("");
+      setConnectionFeedback(errorMessage(cause));
+    },
+  });
+  const disconnect = useMutation({
+    mutationFn: api.removeJellyfin,
+    onSuccess: async () => {
+      setConnectionFeedback(
+        "Jellyfin disconnected. Your notes are still in Library.",
+      );
+      await connectionSaved();
+    },
+    onError: (cause) => setConnectionFeedback(errorMessage(cause)),
   });
   const settings = useQuery({ queryKey: ["settings"], queryFn: api.settings });
   const [language, setLanguage] = useState("eng");
@@ -119,17 +92,6 @@ export function SettingsPage() {
     setTrail(settings.data.noteTrailSeconds);
     setColor(settings.data.defaultNoteColor);
   }, [settings.data]);
-
-  const chooseSession = useMutation({
-    mutationFn: api.selectSession,
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["playback-sessions"] }),
-        queryClient.invalidateQueries({ queryKey: ["playback"] }),
-        queryClient.invalidateQueries({ queryKey: ["settings"] }),
-      ]);
-    },
-  });
 
   const savePreferences = useMutation({
     mutationFn: () =>
@@ -160,134 +122,144 @@ export function SettingsPage() {
           variant="subtle"
           color="gray"
           leftSection={<IconRefresh size={16} />}
-          loading={connections.isFetching}
-          onClick={() => void connections.refetch()}
+          loading={sourceStatus.isFetching}
+          onClick={() => void sourceStatus.refetch()}
         >
           Check services
         </Button>
       </header>
 
-      <section className="settings-section">
-        <div className="settings-section-title">
-          <Text className="eyebrow">CONNECTIONS</Text>
-          <Title order={2}>Your media stack</Title>
-          <Text c="dimmed" size="sm">
-            Credentials are read securely by the Introspect server and never
-            sent to this browser.
-          </Text>
-        </div>
-        {connections.isLoading ? (
-          <div className="connection-grid">
-            {services.map((service) => (
-              <Skeleton key={service.id} height={98} radius="xl" />
-            ))}
-          </div>
-        ) : (
-          <div className="connection-grid">
-            {services.map((service) => (
-              <ConnectionCard
-                key={service.id}
-                definition={service}
-                {...(() => {
-                  const status = connections.data?.services.find(
-                    (item) => item.service === service.id,
-                  );
-                  return status ? { status } : {};
-                })()}
-              />
-            ))}
-          </div>
-        )}
-        {connections.isError && (
-          <Text className="form-error" size="sm">
-            {errorMessage(connections.error)}
-          </Text>
-        )}
-        <Text size="xs" c="dimmed">
-          Update service addresses and API keys in the server environment, then
-          check services again. <IconKey size={12} className="inline-icon" />
-        </Text>
-      </section>
-
       <section className="settings-section settings-two-column">
         <div className="settings-section-title">
-          <Text className="eyebrow">PLAYBACK DEVICE</Text>
-          <Title order={2}>Session to follow</Title>
+          <Title order={2}>Your Jellyfin server</Title>
           <Text c="dimmed" size="sm">
-            Introspect follows one Jellyfin device. Selection is remembered
-            across visits.
+            Connect a server to browse its films, choose exact subtitle tracks
+            and follow playback on your device.
           </Text>
         </div>
-        <Paper className="settings-card" radius="xl">
-          {sessions.isLoading ? (
-            <Stack gap="sm">
-              <Skeleton height={58} radius="lg" />
-              <Skeleton height={58} radius="lg" />
-            </Stack>
-          ) : sessions.data && sessions.data.sessions.length > 0 ? (
-            <Radio.Group
-              value={sessions.data.selectedSessionId ?? ""}
-              onChange={(value) => chooseSession.mutate(value || null)}
-              aria-label="Jellyfin session"
-            >
-              <Stack gap="sm">
-                {sessions.data.sessions.map((item) => (
-                  <label
-                    key={item.id}
-                    className={
-                      item.id === sessions.data.selectedSessionId
-                        ? "session-option selected"
-                        : "session-option"
-                    }
-                  >
-                    <Radio value={item.id} disabled={chooseSession.isPending} />
-                    <div className="session-icon">
-                      <IconDeviceTv size={18} />
-                    </div>
-                    <div className="session-copy">
-                      <Group gap="xs">
-                        <Text size="sm" fw={650}>
-                          {item.deviceName ?? item.client ?? "Jellyfin device"}
-                        </Text>
-                        {item.isActive && <span className="tiny-live-dot" />}
-                      </Group>
-                      <Text size="xs" c="dimmed" lineClamp={1}>
-                        {item.nowPlaying?.title ??
-                          `${item.userName ?? "User"} · idle`}
-                      </Text>
-                    </div>
-                    {item.id === sessions.data.selectedSessionId && (
-                      <IconCheck size={16} color="var(--amber)" />
-                    )}
-                  </label>
-                ))}
-              </Stack>
-            </Radio.Group>
-          ) : (
-            <div className="settings-empty">
-              <IconDeviceTv size={27} stroke={1.3} />
-              <Text fw={650}>No Jellyfin sessions found</Text>
-              <Text size="sm" c="dimmed" ta="center">
-                Open Jellyfin on the device you want to follow, then refresh.
+        <Paper
+          component="form"
+          className="settings-card"
+          radius="lg"
+          onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            setConnectionFeedback(null);
+            saveConnection.mutate();
+          }}
+        >
+          <Stack gap="md">
+            {jellyfin.data?.configured && (
+              <Text fw={650}>
+                Saved connection · {jellyfin.data.serverName}
               </Text>
-              <Button
-                variant="light"
-                size="xs"
-                onClick={() => void sessions.refetch()}
+            )}
+            {!appConfig.data?.authEnabled && (
+              <Text size="sm" c="dimmed">
+                This preview uses one shared Local viewer profile. Everyone
+                using it shares this connection. Separate accounts keep their
+                own connections when sign-in is enabled.
+              </Text>
+            )}
+            <TextInput
+              label="Jellyfin server address"
+              placeholder="https://jellyfin.example.com"
+              type="url"
+              required
+              value={serverUrl}
+              onChange={(event) => setServerUrl(event.currentTarget.value)}
+              disabled={saveConnection.isPending || disconnect.isPending}
+            />
+            <PasswordInput
+              label={
+                jellyfin.data?.configured
+                  ? "Replacement API key or access token"
+                  : "API key or access token"
+              }
+              required
+              value={apiKey}
+              onChange={(event) => setApiKey(event.currentTarget.value)}
+              autoComplete="off"
+              disabled={saveConnection.isPending || disconnect.isPending}
+            />
+            <Text size="xs" c="dimmed">
+              Stored encrypted for your profile; saved keys are never shown.
+              Access follows the key’s permissions. Use a personal access token
+              when you only want your own Jellyfin library and sessions.
+            </Text>
+            {jellyfin.isError && (
+              <Text role="alert" c="red">
+                {errorMessage(jellyfin.error)}
+              </Text>
+            )}
+            {connectionFeedback && (
+              <Text
+                role={
+                  saveConnection.isError || disconnect.isError
+                    ? "alert"
+                    : "status"
+                }
+                size="sm"
               >
-                Refresh sessions
+                {connectionFeedback}
+              </Text>
+            )}
+            <Group justify="space-between">
+              {jellyfin.data?.configured && (
+                <Button
+                  variant="subtle"
+                  color="red"
+                  onClick={() => disconnect.mutate()}
+                  loading={disconnect.isPending}
+                  disabled={saveConnection.isPending}
+                >
+                  Disconnect
+                </Button>
+              )}
+              <Button
+                type="submit"
+                loading={saveConnection.isPending}
+                disabled={
+                  !serverUrl.trim() ||
+                  !apiKey.trim() ||
+                  jellyfin.isLoading ||
+                  disconnect.isPending
+                }
+              >
+                Test and save connection
               </Button>
-            </div>
-          )}
-          {sessions.isError && (
-            <Text className="form-error">{errorMessage(sessions.error)}</Text>
-          )}
-          {chooseSession.isError && (
-            <Text className="form-error">
-              {errorMessage(chooseSession.error)}
+            </Group>
+          </Stack>
+        </Paper>
+      </section>
+      <section className="settings-section settings-two-column">
+        <div className="settings-section-title">
+          <Title order={2}>OpenSubtitles</Title>
+          <Text c="dimmed" size="sm">
+            Subtitle versions for cinema visits and other screens.
+          </Text>
+        </div>
+        <Stack gap="sm">
+          <Text fw={650}>
+            {sourceStatus.isPending
+              ? "Checking configuration…"
+              : sourceStatus.isError
+                ? "Status unavailable"
+                : sourceStatus.data.data.openSubtitlesConfigured
+                  ? "API key configured"
+                  : "API key not configured"}
+          </Text>
+          <Text size="sm" c="dimmed">
+            Managed by the service operator for everyone using this app.{" "}
+            {sourceStatus.data?.data.openSubtitlesConfigured
+              ? "Availability is checked when you search for subtitles."
+              : "Ask the operator to connect OpenSubtitles to enable online subtitle lookup."}
+          </Text>
+          {sourceStatus.isError && (
+            <Text role="alert" c="red">
+              {errorMessage(sourceStatus.error)}
             </Text>
           )}
-        </Paper>
+        </Stack>
       </section>
 
       <section className="settings-section settings-two-column">

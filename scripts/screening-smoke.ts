@@ -57,6 +57,12 @@ const fixture = Bun.serve({
   idleTimeout: 70,
   async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname.endsWith("/connection"))
+      return Response.json({
+        data: { serverName: "Fixture cinema", userId: "fixture-viewer" },
+      });
+    if (url.pathname.endsWith("/status"))
+      return Response.json({ data: { openSubtitlesConfigured: false } });
     if (sourceError)
       return Response.json(
         { code: sourceError, detail: "Untrusted upstream error detail" },
@@ -133,6 +139,11 @@ const child = Bun.spawn([process.execPath, "src/index.ts"], {
 });
 const base = `http://127.0.0.1:${port}`;
 async function request(path: string, method = "GET", body?: unknown) {
+  if (provider === "jellyfin" && path.startsWith("/screening/")) {
+    path += `${path.includes("?") ? "&" : "?"}source=jellyfin`;
+    if (body && typeof body === "object")
+      body = { ...body, source: "jellyfin" };
+  }
   const response = await fetch(`${base}/api${path}`, {
     method,
     headers: { "Content-Type": "application/json" },
@@ -158,6 +169,11 @@ try {
   }
   assert.ok(ready, "Isolated API did not become ready");
   assert.equal((await fetch(`${base}/api/screening/movies`)).status, 400);
+  if (provider === "jellyfin")
+    await request("/settings/jellyfin", "POST", {
+      url: "https://fixture.invalid",
+      apiKey: "synthetic-test-key",
+    });
   const found = await request("/screening/movies?query=fixture");
   assert.equal(found.data[0].id, movie.id);
   assert.equal(found.data[0].provider, provider);
@@ -208,7 +224,10 @@ try {
     cutId: "theatrical",
   });
   assert.equal(first.id, same.id);
-  assert.equal(first.runtimeSource, "meta_egg");
+  assert.equal(
+    first.runtimeSource,
+    provider === "jellyfin" ? "jellyfin" : "meta_egg",
+  );
   await request(`/media/${first.id}/runtime`, "PATCH", {
     runtimeSeconds: 610,
     source: "manual",
@@ -216,12 +235,40 @@ try {
   const reset = await request(`/media/${first.id}/runtime`, "PATCH", {
     runtimeSeconds: null,
   });
-  assert.equal(reset.runtimeSource, "meta_egg");
+  assert.equal(
+    reset.runtimeSource,
+    provider === "jellyfin" ? "jellyfin" : "meta_egg",
+  );
   const other = await request("/screening/timeline", "POST", {
     itemId: movie.id,
     cutId: "extended",
   });
   assert.notEqual(first.id, other.id);
+  if (provider === "jellyfin") {
+    await request("/settings/jellyfin", "POST", {
+      url: "https://second-fixture.invalid",
+      apiKey: "synthetic-second-key",
+    });
+    const otherServer = await request("/screening/timeline", "POST", {
+      itemId: movie.id,
+      cutId: "theatrical",
+    });
+    assert.notEqual(first.id, otherServer.id);
+    assert.equal(otherServer.imageUrl, null);
+    await request("/settings/jellyfin", "POST", {
+      url: "https://fixture.invalid",
+      apiKey: "synthetic-test-key",
+    });
+    assert.equal(
+      (
+        await request("/screening/timeline", "POST", {
+          itemId: movie.id,
+          cutId: "theatrical",
+        })
+      ).id,
+      first.id,
+    );
+  }
   const note = await request(`/media/${first.id}/notes`, "POST", {
     atSeconds: 125,
     body: "The moment I started writing",
@@ -305,7 +352,7 @@ try {
     ["transcript_auth_failed", "subtitle provider rejected its credentials"],
     ["transcript_quota_exceeded", "download or request limit"],
     ["transcript_unavailable", "could not retrieve this subtitle version"],
-    ["screening_storage_unavailable", "check its data volume, then retry"],
+    ["screening_storage_unavailable", "check the service, then retry"],
   ]) {
     sourceError = code!;
     const failure = await fetch(

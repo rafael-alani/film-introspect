@@ -1,15 +1,25 @@
 import { z } from "zod";
 import {
   screeningMoviesSchema,
+  jellyfinConnectionResultSchema,
+  screeningServiceStatusSchema,
   screeningMovieDetailSchema,
   screeningTranscriptSchema,
   screeningSessionsSchema,
 } from "@film-introspect/contracts";
 import { env } from "../env";
 
+export type JellyfinContext = {
+  url: string;
+  apiKey: string;
+  userId?: string | null;
+};
+
 export class MetaEggError extends Error {}
 
 const sourceErrors = {
+  jellyfin_auth_failed:
+    "Jellyfin rejected this key or its permissions. Update the connection in Settings.",
   discovery_unavailable:
     "Meta Egg's online film search is temporarily unavailable. Try again shortly.",
   transcripts_not_configured:
@@ -21,10 +31,11 @@ const sourceErrors = {
   transcript_unavailable:
     "Meta Egg could not retrieve this subtitle version. Try again shortly or choose another matching version.",
   screening_storage_unavailable:
-    "Meta Egg could not safely read or save its private screening library. Ask the operator to check its data volume, then retry.",
+    "Meta Egg could not safely read or save its private screening library. Ask the operator to check the service, then retry.",
 };
 const sourceErrorSchema = z.object({
   code: z.enum([
+    "jellyfin_auth_failed",
     "discovery_unavailable",
     "transcripts_not_configured",
     "transcript_auth_failed",
@@ -37,17 +48,30 @@ const sourceErrorSchema = z.object({
 export async function metaEggRequest<T>(
   path: string,
   schema: z.ZodType<T>,
+  connection?: JellyfinContext | null,
 ): Promise<T> {
   if (!env.META_EGG_URL)
     throw new MetaEggError(
-      "Meta Egg is not configured. Set META_EGG_URL on the Introspect API.",
+      "The film service is not connected. Ask the operator to connect it, then retry.",
     );
   let response: Response;
   try {
     response = await fetch(
       `${env.META_EGG_URL.replace(/\/$/, "")}/v1/screening/${path}`,
       {
-        headers: { Accept: "application/json" },
+        headers: {
+          Accept: "application/json",
+          ...(connection
+            ? {
+                "X-Jellyfin-Url": connection.url,
+                "X-Jellyfin-Key": connection.apiKey,
+                ...(connection.userId
+                  ? { "X-Jellyfin-User": connection.userId }
+                  : {}),
+              }
+            : {}),
+        },
+        redirect: "error",
         signal: AbortSignal.timeout(env.META_EGG_TIMEOUT_MS),
       },
     );
@@ -78,15 +102,20 @@ export async function metaEggRequest<T>(
   return parsed.data;
 }
 export const metaEgg = {
-  movies: (query: string) =>
+  connection: (connection: JellyfinContext) =>
+    metaEggRequest("connection", jellyfinConnectionResultSchema, connection),
+  status: () => metaEggRequest("status", screeningServiceStatusSchema),
+  movies: (query: string, connection?: JellyfinContext | null) =>
     metaEggRequest(
-      `movies?query=${encodeURIComponent(query)}`,
+      `movies?query=${encodeURIComponent(query)}&source=${connection ? "jellyfin" : "external"}`,
       screeningMoviesSchema,
+      connection,
     ),
-  movie: async (id: string) => {
+  movie: async (id: string, connection?: JellyfinContext | null) => {
     const result = await metaEggRequest(
-      `movies/${encodeURIComponent(id)}`,
+      `movies/${encodeURIComponent(id)}?source=${connection ? "jellyfin" : "external"}`,
       screeningMovieDetailSchema,
+      connection,
     );
     if (result.data.id !== id)
       throw new MetaEggError(
@@ -94,10 +123,16 @@ export const metaEgg = {
       );
     return result;
   },
-  transcript: async (itemId: string, cutId: string, index: number) => {
+  transcript: async (
+    itemId: string,
+    cutId: string,
+    index: number,
+    connection?: JellyfinContext | null,
+  ) => {
     const result = await metaEggRequest(
-      `movies/${encodeURIComponent(itemId)}/cuts/${encodeURIComponent(cutId)}/subtitles/${index}`,
+      `movies/${encodeURIComponent(itemId)}/cuts/${encodeURIComponent(cutId)}/subtitles/${index}?source=${connection ? "jellyfin" : "external"}`,
       screeningTranscriptSchema,
+      connection,
     );
     if (
       result.data.itemId !== itemId ||
@@ -109,9 +144,10 @@ export const metaEgg = {
       );
     return result;
   },
-  sessions: (itemId: string) =>
+  sessions: (itemId: string, connection?: JellyfinContext | null) =>
     metaEggRequest(
-      `sessions?itemId=${encodeURIComponent(itemId)}`,
+      `sessions?itemId=${encodeURIComponent(itemId)}&source=${connection ? "jellyfin" : "external"}`,
       screeningSessionsSchema,
+      connection,
     ),
 };

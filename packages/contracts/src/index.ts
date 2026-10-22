@@ -439,6 +439,7 @@ export const screeningSessionsSchema = z.object({
   ),
 });
 export const screeningSelectionSchema = z.object({
+  source: z.enum(["external", "jellyfin"]).default("external"),
   itemId: z.string().min(1).max(200),
   cutId: z.string().min(1).max(200),
 });
@@ -447,3 +448,43 @@ export type ScreeningCut = z.infer<typeof screeningCutSchema>;
 export type ScreeningSession = z.infer<
   typeof screeningSessionsSchema
 >["data"][number];
+
+export const personalJellyfinInputSchema = z.object({
+  url: z
+    .string()
+    .trim()
+    .url()
+    .max(2048)
+    .refine((value) => {
+      const url = new URL(value);
+      return (
+        ["https:", "http:"].includes(url.protocol) &&
+        !url.username &&
+        !url.password &&
+        !url.search &&
+        !url.hash
+      );
+    }, "Use an HTTP(S) server address without credentials, query or fragment"),
+  apiKey: z
+    .string()
+    .trim()
+    .min(1)
+    .max(512)
+    .regex(/^[^\r\n]+$/),
+});
+export const personalJellyfinSchema = z.object({
+  configured: z.boolean(),
+  url: z.string().nullable(),
+  serverName: z.string().nullable(),
+});
+export const screeningServiceStatusSchema = z.object({
+  data: z.object({ openSubtitlesConfigured: z.boolean() }),
+});
+export const jellyfinConnectionResultSchema = z.object({
+  data: z.object({
+    serverName: z.string().min(1),
+    userId: z.string().nullable(),
+  }),
+});
+export type ScreeningSource = "external" | "jellyfin";
+export type PersonalJellyfinInput = z.infer<typeof personalJellyfinInputSchema>;

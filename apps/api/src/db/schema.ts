@@ -194,3 +194,13 @@ export const noteRelations = relations(notes, ({ one }) => ({
 }));
 
 export const authSchema = { user, session, account, verification };
+
+export const userJellyfin = sqliteTable("user_jellyfin", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  serverName: text("server_name").notNull(),
+  credential: text("credential").notNull(),
+  jellyfinUserId: text("jellyfin_user_id"),
+});
