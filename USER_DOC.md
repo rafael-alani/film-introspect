@@ -13,7 +13,7 @@ This guide describes the candidate screening MVP. It is designed for a cinema, a
 | Browse previously opened timelines                  | [Browse the library](#browse-the-library)                     |
 | Label an edition, override runtime, or look up OMDb | [Manage runtimes and editions](#manage-runtimes-and-editions) |
 | Set language, highlighting window, and note color   | [Set preferences](#set-preferences)                           |
-| Check Jellyfin, Bazarr, OMDb, and API status        | [Check connections](#check-connections)                       |
+| Connect Jellyfin and check shared subtitle service status | [Check connections](#check-connections)                |
 | Preview without a Jellyfin server                   | [Try demo mode](#try-demo-mode)                               |
 
 ## Access your journal
