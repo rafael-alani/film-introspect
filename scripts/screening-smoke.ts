@@ -51,6 +51,7 @@ let corruptTranscript = false;
 let unavailable = false;
 let transcriptState = "ready";
 let sourceError: string | null = null;
+const startedAt = Date.now();
 const fixture = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
@@ -69,7 +70,30 @@ const fixture = Bun.serve({
         { status: 502 },
       );
     if (unavailable) return new Response(null, { status: 503 });
-    if (url.pathname.endsWith("/sessions")) return Response.json({ data: [] });
+    if (url.pathname.endsWith("/sessions"))
+      return Response.json({
+        data:
+          provider === "jellyfin" &&
+          (!url.searchParams.has("itemId") ||
+            url.searchParams.get("itemId") === movie.id)
+            ? [
+                {
+                  id: "fixture-tv",
+                  itemId: movie.id,
+                  cutId: "theatrical",
+                  title: movie.title,
+                  runtimeSeconds: 600,
+                  deviceName: "Fixture TV",
+                  state: "playing",
+                  positionSeconds: Math.min(
+                    599,
+                    120 + (Date.now() - startedAt) / 1000,
+                  ),
+                  observedAt: new Date().toISOString(),
+                },
+              ]
+            : [],
+      });
     if (url.pathname.endsWith("/subtitles/0"))
       return Response.json({
         data: {
@@ -178,6 +202,19 @@ try {
   const found = await request("/screening/movies?query=fixture");
   assert.equal(found.data[0].id, movie.id);
   assert.equal(found.data[0].provider, provider);
+  const playing = await request("/screening/sessions");
+  assert.equal(playing.data.length, provider === "jellyfin" ? 1 : 0);
+  if (provider === "jellyfin") {
+    assert.equal(playing.data[0].title, movie.title);
+    assert.equal(
+      (await request(`/screening/sessions?itemId=${movie.id}`)).data[0].id,
+      "fixture-tv",
+    );
+    assert.equal(
+      (await request("/screening/sessions?itemId=other-film")).data.length,
+      0,
+    );
+  }
   assert.equal(found.data[0].provenance.attribution, provenance.attribution);
   assert.equal(
     (await request("/screening/movies?query=missing-fixture")).data.length,
