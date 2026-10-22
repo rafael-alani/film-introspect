@@ -70,6 +70,45 @@ describe("independent screening contracts", () => {
     });
     expect(result.data.provider).toBe("jellyfin");
   });
+  test("preserves discovered metadata when subtitles cannot yet be supplied", () => {
+    for (const state of ["not_configured", "not_found", "unavailable"]) {
+      const result = screeningMovieDetailSchema.parse({
+        data: {
+          ...movie,
+          provider: "discovery",
+          cuts: [],
+          transcriptStatus: { state, message: "Subtitle lookup status." },
+        },
+      });
+      expect(result.data.provider).toBe("discovery");
+      expect(result.data.title).toBe(movie.title);
+      expect(result.data.transcriptStatus?.state).toBe(state);
+      expect(result.data.cuts).toEqual([]);
+    }
+  });
+  test("preserves discovered transcript terms without claiming a license", () => {
+    const result = screeningTranscriptSchema.parse({
+      data: {
+        itemId: movie.id,
+        cutId: cut.id,
+        trackId: "0",
+        language: "eng",
+        source: "discovery",
+        precision: "subtitle_version",
+        provenance: {
+          sourceUrl: "https://example.invalid/release",
+          termsUrl: "https://example.invalid/terms",
+          attribution: "Subtitle release fixture",
+        },
+        cues: [],
+      },
+    });
+    expect(result.data.source).toBe("discovery");
+    expect(result.data.provenance?.termsUrl).toBe(
+      "https://example.invalid/terms",
+    );
+    expect(result.data.provenance?.licenseUrl).toBeUndefined();
+  });
   test("rejects executable reference or attribution links", () => {
     expect(
       screeningMovieDetailSchema.safeParse({
@@ -84,6 +123,15 @@ describe("independent screening contracts", () => {
         data: {
           ...movie,
           provenance: { ...provenance, sourceUrl: "data:text/html,test" },
+          cuts: [cut],
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      screeningMovieDetailSchema.safeParse({
+        data: {
+          ...movie,
+          provenance: { ...provenance, termsUrl: "javascript:alert(1)" },
           cuts: [cut],
         },
       }).success,

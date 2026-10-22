@@ -264,7 +264,7 @@ export function formatTimestamp(totalSeconds: number): string {
 }
 
 // Meta Egg attaches every transcript to a declared subtitle version or media source.
-const screeningSourceSchema = z.enum(["catalog", "jellyfin"]);
+const screeningSourceSchema = z.enum(["catalog", "jellyfin", "discovery"]);
 const screeningPrecisionSchema = z.enum(["subtitle_version", "media_source"]);
 const screeningLinkSchema = z
   .string()
@@ -275,7 +275,8 @@ const screeningLinkSchema = z
   );
 export const screeningProvenanceSchema = z.object({
   sourceUrl: screeningLinkSchema,
-  licenseUrl: screeningLinkSchema,
+  licenseUrl: screeningLinkSchema.optional(),
+  termsUrl: screeningLinkSchema.optional(),
   attribution: z.string().min(1),
 });
 export const screeningMovieSchema = z.object({
@@ -310,7 +311,15 @@ export const screeningMoviesSchema = z.object({
   data: z.array(screeningMovieSchema),
 });
 export const screeningMovieDetailSchema = z.object({
-  data: screeningMovieSchema.extend({ cuts: z.array(screeningCutSchema) }),
+  data: screeningMovieSchema.extend({
+    cuts: z.array(screeningCutSchema),
+    transcriptStatus: z
+      .object({
+        state: z.enum(["ready", "not_configured", "not_found", "unavailable"]),
+        message: z.string().min(1),
+      })
+      .optional(),
+  }),
 });
 export const screeningTranscriptSchema = z.object({
   data: z.object({

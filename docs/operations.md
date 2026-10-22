@@ -6,26 +6,26 @@ This guide covers the supplied single-API SQLite deployment. Commands assume the
 
 Copy [`.env.example`](../.env.example) to `.env` on first setup and edit it. Do not overwrite an existing configuration. API validation lives in [`env.ts`](../apps/api/src/env.ts); Compose maps the variables in [`compose.yaml`](../compose.yaml). Restart a local API or recreate its Compose container after changing settings.
 
-| Variable                           | Default / meaning                                                                                                                                                   |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                         | `development` locally; Compose forces `production`                                                                                                                  |
-| `API_PORT`                         | `3001`; Compose fixes the internal port to 3001                                                                                                                     |
-| `DATABASE_PATH`                    | `./data/introspect.db` relative to API working directory; Compose fixes it to `/data/introspect.db`                                                                 |
-| `WEB_ORIGIN`                       | `http://localhost:5173` locally; exact allowed browser origin; Compose uses `PUBLIC_URL`                                                                            |
-| `BETTER_AUTH_URL`                  | `http://localhost:5173` locally; public app URL used by auth; Compose uses `PUBLIC_URL`                                                                             |
-| `BETTER_AUTH_SECRET`               | At least 32 characters; a development default exists, but production requires an explicit non-default value, even when app login is disabled                        |
-| `APP_AUTH_ENABLED`                 | `false`; uses shared Local viewer when disabled                                                                                                                     |
-| `ALLOW_SIGN_UP`                    | Defaults to true outside production, false in production; `.env.example` explicitly sets true                                                                       |
-| `META_EGG_TIMEOUT_MS`              | `65000` ms; range 1000–180000. Allow Meta Egg's metadata lookup plus subtitle extraction (two upstream requests). The API HTTP idle timeout is five seconds longer. |
-| `META_EGG_URL`                     | Private Meta Egg base URL reachable by the API. Required for Live search, cuts, transcripts and optional session sync. No default or homelab address.               |
-| `JELLYFIN_URL`, `JELLYFIN_API_KEY` | Optional legacy observer; the screening workflow obtains playback through Meta Egg                                                                                  |
-| `JELLYFIN_USER_ID`                 | Optional user scope for ordinary session selection; see [trust limits](architecture.md#authentication-and-trust)                                                    |
-| `JELLYFIN_POLL_INTERVAL_MS`        | `10000`; accepted range 2000–60000                                                                                                                                  |
-| `BAZARR_URL`, `BAZARR_API_KEY`     | Optional pair for status checks; URL may include `/api`                                                                                                             |
-| `OMDB_API_KEY`                     | Optional key for explicit runtime lookup                                                                                                                            |
-| `DEMO_MODE`                        | `false`; simulates playback/subtitles when enabled; note/settings writes still persist                                                                              |
-| `PUBLIC_URL`                       | Compose only: defaults to `http://localhost:8080`; sets API origin/auth URL                                                                                         |
-| `WEB_PORT`                         | Compose only: host port `8080` by default                                                                                                                           |
+| Variable                           | Default / meaning                                                                                                                                          |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                         | `development` locally; Compose forces `production`                                                                                                         |
+| `API_PORT`                         | `3001`; Compose fixes the internal port to 3001                                                                                                            |
+| `DATABASE_PATH`                    | `./data/introspect.db` relative to API working directory; Compose fixes it to `/data/introspect.db`                                                        |
+| `WEB_ORIGIN`                       | `http://localhost:5173` locally; exact allowed browser origin; Compose uses `PUBLIC_URL`                                                                   |
+| `BETTER_AUTH_URL`                  | `http://localhost:5173` locally; public app URL used by auth; Compose uses `PUBLIC_URL`                                                                    |
+| `BETTER_AUTH_SECRET`               | At least 32 characters; a development default exists, but production requires an explicit non-default value, even when app login is disabled               |
+| `APP_AUTH_ENABLED`                 | `false`; uses shared Local viewer when disabled                                                                                                            |
+| `ALLOW_SIGN_UP`                    | Defaults to true outside production, false in production; `.env.example` explicitly sets true                                                              |
+| `META_EGG_TIMEOUT_MS`              | `65000` ms; range 1000–180000. Allow Meta Egg's bounded online lookups and subtitle download/extraction. The API HTTP idle timeout is five seconds longer. |
+| `META_EGG_URL`                     | Private Meta Egg base URL reachable by the API. Required for Live search, cuts, transcripts and optional session sync. No default or homelab address.      |
+| `JELLYFIN_URL`, `JELLYFIN_API_KEY` | Optional legacy observer; the screening workflow obtains playback through Meta Egg                                                                         |
+| `JELLYFIN_USER_ID`                 | Optional user scope for ordinary session selection; see [trust limits](architecture.md#authentication-and-trust)                                           |
+| `JELLYFIN_POLL_INTERVAL_MS`        | `10000`; accepted range 2000–60000                                                                                                                         |
+| `BAZARR_URL`, `BAZARR_API_KEY`     | Optional pair for status checks; URL may include `/api`                                                                                                    |
+| `OMDB_API_KEY`                     | Optional key for explicit runtime lookup                                                                                                                   |
+| `DEMO_MODE`                        | `false`; simulates playback/subtitles when enabled; note/settings writes still persist                                                                     |
+| `PUBLIC_URL`                       | Compose only: defaults to `http://localhost:8080`; sets API origin/auth URL                                                                                |
+| `WEB_PORT`                         | Compose only: host port `8080` by default                                                                                                                  |
 
 Boolean true values accepted by the API are `1`, `true`, `yes`, and `on` (case insensitive); other strings are false. Prefer explicit `true`/`false` in `.env`. The optional frontend `VITE_API_URL` setting is covered in [development](development.md#local-setup).
 
@@ -35,11 +35,11 @@ Configure Bazarr's Jellyfin integration and metadata refresh in Bazarr itself. I
 
 ## Meta Egg screening contract
 
-Configure `META_EGG_URL` with a private, reachable Meta Egg standalone catalog service exposing `/v1/screening/movies`, movie detail, cut-specific transcripts and scoped sessions. Introspect needs no media filesystem mount and no Jellyfin credential for this path. Meta Egg's deployment owns its catalog manifest and matching transcript files. The initial catalog contains the licensed **Sintel** pilot; adding other films requires their metadata, a declared subtitle version and matching transcript source. No Jellyfin service is required. If the optional Jellyfin provider is used, its endpoint, read credentials and permitted user also belong to Meta Egg's deployment. Do not expose Meta Egg's unauthenticated API publicly.
+Configure `META_EGG_URL` with a private, reachable Meta Egg service exposing `/v1/screening/movies`, movie detail, cut-specific transcripts and scoped sessions. Introspect needs no media filesystem mount and no Jellyfin credential for this path. Meta Egg's deployment owns online metadata discovery, subtitle provider credentials and its standalone catalog manifest/transcript files. The standalone catalog includes the licensed **Sintel** pilot. Online discovery returns film metadata before a subtitle version is available. Movie detail returns an optional `transcriptStatus` (`ready`, `not_configured`, `not_found`, or `unavailable`), which Live displays alongside the metadata and a retry action. No Jellyfin service is required. If the optional Jellyfin provider is used, its endpoint, read credentials and permitted user also belong to Meta Egg's deployment. Do not expose Meta Egg's unauthenticated API publicly.
 
 The Compose API keeps notes in `/data/introspect.db` on `introspect_data`; the web service exposes port 80 through `WEB_PORT`, and `/api/health` is the liveness probe. Deployment assignments may replace the named volume with a scoped host bind mount. API health is not evidence that Meta Egg, a transcript or a screening is usable.
 
-A missing or unavailable Meta Egg connection is shown in Live. Bitmap-only subtitles need a text track; no OCR, download job, fake demo transcript, or alternate cut is used as fallback. Keep server and client clocks synchronized for automatic session freshness checks. Scope the Meta Egg user before testing optional Jellyfin playback.
+A missing or unavailable Meta Egg connection is shown in Live. Known subtitle provider authentication and quota failures have actionable messages; arbitrary upstream error details are not forwarded to the browser. Searching again repeats metadata lookup, and **Retry subtitle search** repeats the selected movie's detail lookup. Provider setup and quotas belong to Meta Egg, not Introspect. Bitmap-only subtitles need a text track; no OCR, download job, fake demo transcript, or alternate cut is used as fallback. Keep server and client clocks synchronized for automatic session freshness checks. Scope the Meta Egg user before testing optional Jellyfin playback.
 
 ## Authentication and access
 

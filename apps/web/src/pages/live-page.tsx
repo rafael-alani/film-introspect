@@ -161,7 +161,13 @@ export function LivePage() {
     enabled: !!movieId,
     retry: 1,
   });
-  const cuts = movie.data?.data.cuts ?? [];
+  const currentSearch = query.length > 0 && query === search.trim();
+  const showResults = currentSearch && !movies.isFetching && !movies.isError;
+  const selectedMovie = showResults
+    ? movies.data?.data.find((item) => item.id === movieId)
+    : undefined;
+  const detail = movie.data?.data.id === movieId ? movie.data.data : undefined;
+  const cuts = detail?.cuts ?? [];
   const selectedCut =
     cuts.find((cut) => cut.id === cutId) ??
     (cuts.length === 1 ? cuts[0] : undefined);
@@ -189,22 +195,27 @@ export function LivePage() {
         className="screening-search"
         onSubmit={(event) => {
           event.preventDefault();
-          setQuery(search.trim());
           setMovieId(null);
           setCutId(null);
+          if (search.trim() === query) void movies.refetch();
+          else setQuery(search.trim());
         }}
       >
         <TextInput
           label="Find a film in Meta Egg"
           placeholder="Movie title"
           value={search}
-          onChange={(event) => setSearch(event.currentTarget.value)}
+          onChange={(event) => {
+            setSearch(event.currentTarget.value);
+            setMovieId(null);
+            setCutId(null);
+          }}
           maxLength={200}
           leftSection={<IconSearch size={18} />}
         />
         <Button
           type="submit"
-          loading={movies.isFetching}
+          loading={currentSearch && movies.isFetching}
           disabled={!search.trim()}
         >
           Search films
@@ -212,12 +223,17 @@ export function LivePage() {
       </form>
       {!query && (
         <Text c="dimmed" mt="lg">
-          Search Meta Egg's available catalog. A matching subtitle version is
-          needed for the film on screen.
+          Search for a film. Meta Egg looks up its metadata and available
+          subtitle versions for the screen you are watching.
         </Text>
       )}
-      {movies.isLoading && <Loader mt="xl" aria-label="Loading films" />}
-      {movies.isError && (
+      {currentSearch && movies.isFetching && (
+        <Group mt="xl" role="status" aria-live="polite">
+          <Loader size="sm" />
+          <Text c="dimmed">Meta Egg is searching film metadata…</Text>
+        </Group>
+      )}
+      {currentSearch && movies.isError && !movies.isFetching && (
         <Text role="alert" className="form-error" mt="lg">
           {errorMessage(movies.error)}{" "}
           <Button variant="subtle" onClick={() => void movies.refetch()}>
@@ -225,41 +241,52 @@ export function LivePage() {
           </Button>
         </Text>
       )}
-      {movies.data?.data.length === 0 && (
+      {showResults && movies.data?.data.length === 0 && (
         <Text c="dimmed" mt="xl">
-          No matching film is available yet. Its metadata and a matching
-          transcript need to be added to Meta Egg's catalog.
+          Meta Egg found no matching film. Try another spelling or title.
         </Text>
       )}
       <div className="screening-results">
-        {movies.data?.data.map((item) => (
-          <button
-            className={`screening-result${item.id === movieId ? " selected" : ""}`}
-            key={item.id}
-            onClick={() => {
-              setMovieId(item.id);
-              setCutId(null);
-            }}
-            aria-pressed={item.id === movieId}
-          >
-            <span>{item.title}</span>
-            <span>
-              {[
-                item.year,
-                item.runtimeSeconds
-                  ? `${Math.round(item.runtimeSeconds / 60)} min`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-          </button>
-        ))}
+        {showResults &&
+          movies.data?.data.map((item) => (
+            <button
+              className={`screening-result${item.id === movieId ? " selected" : ""}`}
+              key={item.id}
+              onClick={() => {
+                setMovieId(item.id);
+                setCutId(null);
+              }}
+              aria-pressed={item.id === movieId}
+            >
+              <span>{item.title}</span>
+              <span>
+                {[
+                  item.year,
+                  item.runtimeSeconds
+                    ? `${Math.round(item.runtimeSeconds / 60)} min`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </button>
+          ))}
       </div>
-      {movieId && (
+      {selectedMovie && (
         <section className="screening-selection" aria-label="Choose your cut">
-          {movie.isLoading && <Loader aria-label="Loading cuts" />}
-          {movie.isError && (
+          <Title order={2}>{detail?.title ?? selectedMovie.title}</Title>
+          {(detail?.overview ?? selectedMovie.overview) && (
+            <Text c="dimmed" maw="65ch" mt="sm">
+              {detail?.overview ?? selectedMovie.overview}
+            </Text>
+          )}
+          {movie.isFetching && (
+            <Group mt="md" role="status" aria-live="polite">
+              <Loader size="sm" />
+              <Text c="dimmed">Meta Egg is finding subtitle versions…</Text>
+            </Group>
+          )}
+          {movie.isError && !movie.isFetching && (
             <Text role="alert" className="form-error">
               {errorMessage(movie.error)}{" "}
               <Button variant="subtle" onClick={() => void movie.refetch()}>
@@ -267,19 +294,26 @@ export function LivePage() {
               </Button>
             </Text>
           )}
-          {movie.data && (
-            <Stack gap="md">
-              <Title order={2}>{movie.data.data.title}</Title>
-              {movie.data.data.overview && (
-                <Text c="dimmed" maw="65ch">
-                  {movie.data.data.overview}
-                </Text>
-              )}
+          {detail && !movie.isFetching && !movie.isError && (
+            <Stack gap="md" mt="md">
+              {detail.transcriptStatus &&
+                detail.transcriptStatus.state !== "ready" && (
+                  <Text role="status" c="dimmed">
+                    {detail.transcriptStatus.message}{" "}
+                    <Button
+                      variant="subtle"
+                      onClick={() => void movie.refetch()}
+                    >
+                      Retry subtitle search
+                    </Button>
+                  </Text>
+                )}
               <Select
                 label="Cut / subtitle version"
                 placeholder="Choose the version you are watching"
                 value={selectedCut?.id ?? null}
                 onChange={setCutId}
+                disabled={cuts.length === 0}
                 data={cuts.map((cut) => ({
                   value: cut.id,
                   label: `${cut.label}${cut.runtimeSeconds ? ` · ${Math.round(cut.runtimeSeconds / 60)} min` : ""}`,
@@ -289,16 +323,24 @@ export function LivePage() {
                 Match the version on screen. Different cuts have separate
                 subtitle timing and notes; runtimes are never stretched.
               </Text>
-              {cuts.length === 0 && (
+              {cuts.length === 0 && !detail.transcriptStatus && (
                 <Text className="form-error">
-                  Meta Egg has no declared subtitle version for this film.
+                  Meta Egg found the film, but no subtitle version is available.
                 </Text>
               )}
+              {selectedCut &&
+                !selectedCut.subtitles.some((track) => track.available) && (
+                  <Text c="dimmed">
+                    This version has no available text subtitles.
+                  </Text>
+                )}
               <Button
-                disabled={!selectedCut}
+                disabled={
+                  !selectedCut?.subtitles.some((track) => track.available)
+                }
                 onClick={() => {
-                  if (selectedCut)
-                    setScreening({ movie: movie.data.data, cut: selectedCut });
+                  if (selectedCut?.subtitles.some((track) => track.available))
+                    setScreening({ movie: detail, cut: selectedCut });
                 }}
                 style={{ alignSelf: "flex-start" }}
               >
@@ -387,7 +429,9 @@ function Screening({
   );
   const displayPosition = notePosition(position, draftPosition);
   const cues = transcript.data?.data.cues ?? [];
-  const provenance = transcript.data?.data.provenance ?? movie.provenance;
+  const provenance =
+    transcript.data?.data.provenance ??
+    (movie.provider === "discovery" ? undefined : movie.provenance);
   const visibleCues = cueWindow(cues, displayPosition);
   const stale =
     mode === "jellyfin" &&
@@ -791,15 +835,32 @@ function Screening({
               >
                 Source
               </Anchor>
-              {" · "}
-              <Anchor
-                size="xs"
-                href={provenance.licenseUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                License
-              </Anchor>
+              {provenance.licenseUrl && (
+                <>
+                  {" · "}
+                  <Anchor
+                    size="xs"
+                    href={provenance.licenseUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    License
+                  </Anchor>
+                </>
+              )}
+              {provenance.termsUrl && (
+                <>
+                  {" · "}
+                  <Anchor
+                    size="xs"
+                    href={provenance.termsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Terms
+                  </Anchor>
+                </>
+              )}
             </Text>
           )}
         </Paper>

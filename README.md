@@ -13,7 +13,7 @@ cp .env.example .env
 bun install --frozen-lockfile
 ```
 
-Edit `.env` before starting. Set `META_EGG_URL` to your private Meta Egg API with a standalone screening catalog. The initial licensed pilot contains one film, **Sintel**; more films require metadata and a matching transcript version added to Meta Egg. No Jellyfin credential is needed for this workflow. The Live workflow needs Meta Egg's `/v1/screening` API. Direct Jellyfin, Bazarr and OMDb settings are optional legacy integrations; they are not required for screening notes. Reuse an existing `.env` instead of overwriting it.
+Edit `.env` before starting. Set `META_EGG_URL` to your private Meta Egg API. Meta Egg searches configured online metadata sources as well as its standalone catalog, which includes the licensed **Sintel** pilot. Selecting a film asks Meta Egg for subtitle versions; online subtitle discovery needs a configured provider on Meta Egg. If none can be supplied, the film's metadata remains visible with the reason. No Jellyfin credential is needed for this workflow. The Live workflow needs Meta Egg's `/v1/screening` API. Direct Jellyfin, Bazarr and OMDb settings are optional legacy integrations; they are not required for screening notes. Reuse an existing `.env` instead of overwriting it.
 
 ```bash
 bun dev

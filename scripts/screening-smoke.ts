@@ -1,11 +1,17 @@
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 
-const provider = process.argv.includes("--jellyfin") ? "jellyfin" : "catalog";
-const precision = provider === "catalog" ? "subtitle_version" : "media_source";
+const provider = process.argv.includes("--jellyfin")
+  ? "jellyfin"
+  : process.argv.includes("--discovery")
+    ? "discovery"
+    : "catalog";
+const precision = provider === "jellyfin" ? "media_source" : "subtitle_version";
 const provenance = {
   sourceUrl: "https://example.invalid/fixture",
-  licenseUrl: "https://example.invalid/license",
+  ...(provider === "discovery"
+    ? { termsUrl: "https://example.invalid/terms" }
+    : { licenseUrl: "https://example.invalid/license" }),
   attribution: "Synthetic contract fixture, not a real film.",
 };
 
@@ -42,12 +48,19 @@ const cuts = ["theatrical", "extended"].map((id) => ({
 }));
 let corruptTranscript = false;
 let unavailable = false;
+let transcriptState = "ready";
+let sourceError: string | null = null;
 const fixture = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
   idleTimeout: 70,
   async fetch(request) {
     const url = new URL(request.url);
+    if (sourceError)
+      return Response.json(
+        { code: sourceError, detail: "Untrusted upstream error detail" },
+        { status: 502 },
+      );
     if (unavailable) return new Response(null, { status: 503 });
     if (url.pathname.endsWith("/sessions")) return Response.json({ data: [] });
     if (url.pathname.endsWith("/subtitles/0"))
@@ -69,12 +82,23 @@ const fixture = Bun.serve({
         },
       });
     if (url.pathname.endsWith(`/movies/${movie.id}`))
-      return Response.json({ data: { ...movie, cuts } });
+      return Response.json({
+        data: {
+          ...movie,
+          cuts: transcriptState === "ready" ? cuts : [],
+          transcriptStatus: {
+            state: transcriptState,
+            message: `Fixture subtitle status: ${transcriptState}.`,
+          },
+        },
+      });
     if (url.pathname.endsWith("/movies")) {
       if (url.searchParams.get("query") === "slow-fixture")
         await Bun.sleep(16_000);
       if (!url.searchParams.get("query")?.trim())
         return new Response(null, { status: 400 });
+      if (url.searchParams.get("query") === "missing-fixture")
+        return Response.json({ data: [] });
       return Response.json({ data: [movie] });
     }
     return new Response(null, { status: 404 });
@@ -135,6 +159,18 @@ try {
   assert.equal(found.data[0].id, movie.id);
   assert.equal(found.data[0].provider, provider);
   assert.equal(found.data[0].provenance.attribution, provenance.attribution);
+  assert.equal(
+    (await request("/screening/movies?query=missing-fixture")).data.length,
+    0,
+  );
+  for (const state of ["not_configured", "not_found", "unavailable"]) {
+    transcriptState = state;
+    const metadataOnly = await request(`/screening/movies/${movie.id}`);
+    assert.equal(metadataOnly.data.title, movie.title);
+    assert.equal(metadataOnly.data.cuts.length, 0);
+    assert.equal(metadataOnly.data.transcriptStatus.state, state);
+  }
+  transcriptState = "ready";
   if (process.argv.includes("--slow")) {
     const delayed = await request("/screening/movies?query=slow-fixture");
     assert.equal(delayed.data[0].id, movie.id);
@@ -146,6 +182,7 @@ try {
   assert.equal(detail.data.cuts.length, 2);
   assert.equal(detail.data.cuts[0].precision, precision);
   assert.equal(detail.data.cuts[0].editionId, "theatrical");
+  assert.equal(detail.data.transcriptStatus.state, "ready");
   const transcript = await request(
     `/screening/movies/${movie.id}/cuts/theatrical/subtitles/0`,
   );
@@ -153,6 +190,10 @@ try {
   assert.equal(transcript.data.cues.length, 120);
   assert.equal(transcript.data.source, provider);
   assert.equal(transcript.data.precision, precision);
+  if (provider === "discovery") {
+    assert.equal(transcript.data.provenance.termsUrl, provenance.termsUrl);
+    assert.equal(transcript.data.provenance.licenseUrl, undefined);
+  }
   const first = await request("/screening/timeline", "POST", {
     itemId: movie.id,
     cutId: "theatrical",
@@ -218,16 +259,36 @@ try {
   assert.equal(mismatched.status, 502);
   assert.equal((await mismatched.json()).error.code, "META_EGG_UNAVAILABLE");
   corruptTranscript = false;
+  for (const [code, message] of [
+    ["discovery_unavailable", "online film search is temporarily unavailable"],
+    [
+      "transcripts_not_configured",
+      "online subtitle provider is not configured",
+    ],
+    ["transcript_auth_failed", "subtitle provider rejected its credentials"],
+    ["transcript_quota_exceeded", "download or request limit"],
+    ["transcript_unavailable", "could not retrieve this subtitle version"],
+  ]) {
+    sourceError = code!;
+    const failure = await fetch(
+      `${base}/api/screening/movies/${movie.id}/cuts/theatrical/subtitles/0`,
+    );
+    assert.equal(failure.status, 502);
+    const body = await failure.json();
+    assert.ok(body.error.message.includes(message));
+    assert.ok(!body.error.message.includes("Untrusted upstream error detail"));
+  }
+  sourceError = null;
   unavailable = true;
   const offline = await fetch(`${base}/api/screening/movies?query=fixture`);
   assert.equal(offline.status, 502);
   assert.match(
     (await offline.json()).error.message,
-    /film library is not connected yet/,
+    /film search is unavailable/,
   );
   unavailable = false;
   console.info(
-    "PASS: Meta Egg search, cuts, transcript, timeline reuse, cut isolation, note timestamp, invalid timeline, wrong-cut rejection, and unavailable upstream checks.",
+    `PASS (${provider}): Meta Egg search/no-match, metadata with subtitle statuses, cuts, transcript provenance, timeline reuse, cut isolation, note timestamp, invalid timeline, wrong-cut rejection, and unavailable upstream checks.`,
   );
   if (serve) {
     console.info(
