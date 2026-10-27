@@ -222,10 +222,6 @@ export function LivePage() {
         throw new Error(
           "This player has not identified an available media version. Choose the film and version below.",
         );
-      if (!cut.subtitles.some((track) => track.available))
-        throw new Error(
-          "The playing version has no readable subtitles. Choose another film or use Any screen with a matching subtitle release.",
-        );
       return { movie, cut, initialSessionId: session.id };
     },
     onSuccess: (selection) => {
@@ -580,15 +576,15 @@ export function LivePage() {
               {selectedCut &&
                 !selectedCut.subtitles.some((track) => track.available) && (
                   <Text c="dimmed">
-                    This version has no available text subtitles.
+                    {selectedCut.subtitles.length
+                      ? "This version has image subtitles. You can still follow playback and take notes; a text transcript is unavailable here."
+                      : "This version has no subtitle tracks. You can still sync the clock and take notes."}
                   </Text>
                 )}
               <Button
-                disabled={
-                  !selectedCut?.subtitles.some((track) => track.available)
-                }
+                disabled={!selectedCut}
                 onClick={() => {
-                  if (selectedCut?.subtitles.some((track) => track.available))
+                  if (selectedCut)
                     setScreening({ movie: detail, cut: selectedCut });
                 }}
                 style={{ alignSelf: "flex-start" }}
@@ -628,6 +624,7 @@ function Screening({
       )?.index ?? "",
     );
   });
+  const hasTextTrack = trackIndex !== null && trackIndex !== "";
   const source = movie.provider === "jellyfin" ? "jellyfin" : "external";
   const [mode, setMode] = useState(
     movie.provider === "jellyfin" ? "jellyfin" : "manual",
@@ -665,7 +662,7 @@ function Screening({
     queryKey: ["screening-transcript", sourceKey, movie.id, cut.id, trackIndex],
     queryFn: () =>
       api.screeningTranscript(movie.id, cut.id, Number(trackIndex), source),
-    enabled: trackIndex !== null && trackIndex !== "",
+    enabled: hasTextTrack,
     retry: 1,
     staleTime: 60_000,
   });
@@ -753,7 +750,11 @@ function Screening({
       setDraftPosition(null);
       setDraftMark(null);
       textarea.current?.blur();
-      setFeedback("Saved. Subtitles caught up to the film.");
+      setFeedback(
+        cues.length
+          ? "Saved. Subtitles caught up to the film."
+          : "Saved. Back at the current film time.",
+      );
       await invalidateNotes();
     },
     onError: (cause) => setFeedback(errorMessage(cause)),
@@ -1074,16 +1075,16 @@ function Screening({
                 ? `Held at ${formatTimestamp(draftPosition)}`
                 : "Live subtitles"}
             </Text>
-            {transcript.isFetching && <Loader size="xs" />}
+            {hasTextTrack && transcript.isFetching && <Loader size="xs" />}
           </div>
           <Select
             label="Subtitle track"
             value={trackIndex}
             onChange={setTrackIndex}
-            disabled={draftPosition !== null}
+            disabled={draftPosition !== null || !hasTextTrack}
             data={cut.subtitles.map((track) => ({
               value: String(track.index),
-              label: `${track.label}${track.available ? "" : " — image subtitles unavailable"}`,
+              label: `${track.label}${track.available ? "" : " — image track"}`,
               disabled: !track.available,
             }))}
             placeholder="No text subtitles available"
@@ -1107,14 +1108,18 @@ function Screening({
             ))}
             {!visibleCues.length && (
               <Text c="dimmed" size="sm">
-                {transcript.isError
-                  ? errorMessage(transcript.error)
-                  : transcript.isFetching
-                    ? "Loading this cut's transcript…"
-                    : "No text transcript is available for this cut. Add a matching transcript to Meta Egg."}
+                {!hasTextTrack
+                  ? cut.subtitles.length
+                    ? "This version uses image subtitles. Your player can display them, but Introspect cannot show them as text. The clock and notes still work."
+                    : "This version has no subtitle tracks. The clock and notes still work."
+                  : transcript.isError
+                    ? errorMessage(transcript.error)
+                    : transcript.isFetching
+                      ? "Loading this cut's transcript…"
+                      : "No dialogue at this moment."}
               </Text>
             )}
-            {transcript.isError && (
+            {hasTextTrack && transcript.isError && (
               <Button
                 mt="sm"
                 variant="subtle"
@@ -1124,13 +1129,15 @@ function Screening({
               </Button>
             )}
           </div>
-          <Text className="subtitle-source">
-            Meta Egg ·{" "}
-            {transcript.data?.data.language?.toUpperCase() ?? "text track"} ·
-            {cut.precision === "subtitle_version"
-              ? "declared subtitle version · verify alignment"
-              : "matched to this media version"}
-          </Text>
+          {transcript.data && (
+            <Text className="subtitle-source">
+              Meta Egg ·{" "}
+              {transcript.data?.data.language?.toUpperCase() ?? "text track"} ·
+              {cut.precision === "subtitle_version"
+                ? "declared subtitle version · verify alignment"
+                : "matched to this media version"}
+            </Text>
+          )}
           {transcript.data?.data.savedAt && !transcript.isError && (
             <Text size="xs" c="dimmed" mt="sm" role="status">
               Transcript saved in Meta Egg

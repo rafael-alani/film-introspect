@@ -61,6 +61,7 @@ let corruptTranscript = false;
 let unavailable = false;
 let transcriptState = "ready";
 let sourceError: string | null = null;
+let subtitleMode: "text" | "image" | "none" = "text";
 const startedAt = Date.now();
 const fixture = Bun.serve({
   port: 0,
@@ -104,6 +105,8 @@ const fixture = Bun.serve({
               ]
             : [],
       });
+    if (url.pathname.endsWith("/subtitles/0") && subtitleMode !== "text")
+      return Response.json({ code: "transcript_unavailable" }, { status: 422 });
     if (url.pathname.endsWith("/subtitles/0"))
       return Response.json({
         data: {
@@ -128,7 +131,25 @@ const fixture = Bun.serve({
         data: {
           ...movie,
           savedAt,
-          cuts: transcriptState === "ready" ? cuts : [],
+          cuts:
+            transcriptState === "ready"
+              ? cuts.map((cut) => ({
+                  ...cut,
+                  subtitles:
+                    subtitleMode === "none"
+                      ? []
+                      : cut.subtitles.map((track) =>
+                          subtitleMode === "image"
+                            ? {
+                                ...track,
+                                label: "English - PGSSUB",
+                                codec: "PGSSUB",
+                                available: false,
+                              }
+                            : track,
+                        ),
+                }))
+              : [],
           transcriptStatus: {
             state: transcriptState,
             message: `Fixture subtitle status: ${transcriptState}.`,
@@ -424,6 +445,37 @@ try {
     /film search is unavailable/,
   );
   unavailable = false;
+  if (provider === "jellyfin") {
+    for (const mode of ["image", "none"] as const) {
+      subtitleMode = mode;
+      const detail = await request(`/screening/movies/${movie.id}`);
+      assert.ok(
+        !detail.data.cuts[0].subtitles.some(
+          (track: { available: boolean }) => track.available,
+        ),
+      );
+      const timeline = await request("/screening/timeline", "POST", {
+        itemId: movie.id,
+        cutId: "theatrical",
+      });
+      assert.equal(timeline.id, first.id);
+      const note = await request(`/media/${timeline.id}/notes`, "POST", {
+        atSeconds: 142,
+        body: "No text transcript needed",
+        color: "amber",
+      });
+      assert.equal(note.atSeconds, 142);
+      const stored = await request(`/media/${timeline.id}/notes`);
+      assert.ok(
+        stored.notes.some((entry: { id: string }) => entry.id === note.id),
+      );
+    }
+    subtitleMode = process.argv.includes("--image-subtitles")
+      ? "image"
+      : process.argv.includes("--no-subtitles")
+        ? "none"
+        : "text";
+  }
   console.info(
     `PASS (${provider}): Meta Egg search/no-match, metadata with subtitle statuses, cuts, transcript provenance, save acknowledgements, timeline reuse, cut isolation, note timestamp, empty-text color/rating pings, partial edits, rating validation, invalid timeline, wrong-cut rejection, and safe upstream/storage errors.`,
   );
