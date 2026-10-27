@@ -47,6 +47,8 @@ A declared subtitle version identifies the timing source; it does not automatica
 
 ## Read subtitles
 
+Jellyfin's **Follow playback** also supports individual TV episodes. Notes belong to that episode's exact media version; Library lists them under **Shows** with the series, season and episode. Jellyfin search accepts episode titles as well as film titles. **Any screen** continues to search films only.
+
 The subtitle roll shows the current line and nearby dialogue from Meta Egg's selected transcript. Change the track in the screening itself. Loading, missing tracks and upstream failures are shown explicitly, with retry for failed requests. A failed track never silently switches to another cut or to demo content.
 
 When you begin a note, the subtitle view stays at that scene while the underlying film clock continues. **Save & catch up**, a color ping, or a rating ping returns to the current line after saving. **Return to live** asks before discarding text or an unsaved ping. No request pauses the movie.

@@ -7,6 +7,8 @@ const provider = process.argv.includes("--jellyfin")
     ? "discovery"
     : "catalog";
 const precision = provider === "jellyfin" ? "media_source" : "subtitle_version";
+const episode = process.argv.includes("--episode");
+if (episode) assert.equal(provider, "jellyfin", "Episodes require --jellyfin");
 const savedAt = "2026-10-22T12:34:56.000Z";
 const provenance = {
   sourceUrl: "https://example.invalid/fixture",
@@ -19,6 +21,14 @@ const provenance = {
 // Isolated contract fixture for API checks and a browser walkthrough; never a production fallback.
 const movie = {
   provider,
+  ...(episode
+    ? {
+        kind: "episode",
+        contextTitle: "Example series",
+        seasonNumber: 3,
+        episodeNumber: 2,
+      }
+    : {}),
   provenance,
   id: "fixture-film",
   title: "Screening timing fixture",
@@ -262,6 +272,10 @@ try {
     cutId: "theatrical",
   });
   assert.equal(first.id, same.id);
+  assert.equal(first.kind, episode ? "episode" : "movie");
+  assert.equal(first.contextTitle, episode ? "Example series" : null);
+  assert.equal(first.seasonNumber, episode ? 3 : null);
+  assert.equal(first.episodeNumber, episode ? 2 : null);
   assert.equal(
     first.runtimeSource,
     provider === "jellyfin" ? "jellyfin" : "meta_egg",

@@ -31,6 +31,8 @@ The older direct Jellyfin, Bazarr and OMDb adapters remain for legacy API client
 
 ## Playback and subtitle synchronization
 
+Jellyfin screening detail and search support movies and individual episodes through the existing `/movies` routes. Optional `kind`, `contextTitle`, `seasonNumber` and `episodeNumber` fields survive proxy validation and timeline storage, so episodes appear under Library's Shows filter with their series context. Older or standalone film responses omit these fields and retain movie defaults. Episode notes keep the same user/server/item/media-source identity; there is no cross-episode or cross-cut merge.
+
 The browser owns the active screening clock. Manual mode uses an explicit film-time anchor plus a monotonic timer. A dialogue search can re-anchor at a known cue; half-second corrections adjust the subtitle clock without changing the movie. Leaving/reloading the screening loses this transient clock and requires calibration again.
 
 For `provider: catalog` and `provider: discovery` entries, the UI offers only manual alignment and makes no session request. `subtitle_version` precision describes the supplied transcript version, not an automatic match to the screen. Meta Egg can provide matching notes, a reference video link and source attribution, optional license links and optional provider terms; all external links are validated as HTTP(S). The player is separate from Introspect.
