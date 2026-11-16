@@ -671,10 +671,7 @@ function Screening({
         <div>
           <Title order={1}>{movie.title}</Title>
           <Text c="dimmed" size="sm">
-            {[
-              movie.year,
-              runtime ? `${Math.round(runtime / 60)} min` : null,
-            ]
+            {[movie.year, runtime ? `${Math.round(runtime / 60)} min` : null]
               .filter(Boolean)
               .join(" · ")}
           </Text>
