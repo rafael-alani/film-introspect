@@ -672,9 +672,7 @@ function Screening({
           <Title order={1}>{movie.title}</Title>
           <Text c="dimmed" size="sm">
             {[
-              serverName,
               movie.year,
-              cut.label,
               runtime ? `${Math.round(runtime / 60)} min` : null,
             ]
               .filter(Boolean)
@@ -715,6 +713,9 @@ function Screening({
       >
         <summary>Sync with the screen</summary>
         <Stack gap="md" mt="md">
+          <Text size="sm" c="dimmed">
+            {[serverName, cut.label].filter(Boolean).join(" · ")}
+          </Text>
           {cut.matchingNotes && (
             <Text size="sm" c="dimmed">
               {cut.matchingNotes}
