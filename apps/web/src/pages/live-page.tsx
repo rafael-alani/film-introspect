@@ -1,7 +1,5 @@
 import {
-  ActionIcon,
   Anchor,
-  Badge,
   Button,
   Group,
   Loader,
@@ -13,19 +11,10 @@ import {
   Textarea,
   TextInput,
   Title,
-  Tooltip,
 } from "@mantine/core";
-import {
-  IconCheck,
-  IconEdit,
-  IconSearch,
-  IconTrash,
-  IconX,
-} from "@tabler/icons-react";
+import { IconSearch } from "@tabler/icons-react";
 import {
   formatTimestamp,
-  momentRatings,
-  noteColors,
   type CreateNoteInput,
   type Note,
   type UpdateNoteInput,
@@ -37,6 +26,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "../api/client";
+import { TimedNote } from "../components/timed-note";
 import { MomentControls, MomentGuide } from "../components/moment-controls";
 import {
   clockPosition,
@@ -48,139 +38,6 @@ import {
   chooseScreeningSession,
   type ClockAnchor,
 } from "../hooks/screening-clock";
-
-function TimedNote({
-  note,
-  position,
-  lead,
-  trail,
-  onUpdate,
-  onDelete,
-  pending,
-}: {
-  note: Note;
-  position: number;
-  lead: number;
-  trail: number;
-  onUpdate: (note: Note, input: UpdateNoteInput) => Promise<unknown>;
-  onDelete: (note: Note) => void;
-  pending: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [body, setBody] = useState(note.body);
-  const isNear =
-    note.atSeconds >= position - trail && note.atSeconds <= position + lead;
-  const saveChanges = (input: UpdateNoteInput) => {
-    void onUpdate(note, { ...(editing ? { body: body.trim() } : {}), ...input })
-      .then(() => setEditing(false))
-      .catch(() => {});
-  };
-
-  return (
-    <article
-      className={`timed-note note-${note.color}${isNear ? " active" : ""}`}
-    >
-      <div className="note-time">
-        <span className={`note-dot note-${note.color}`} />
-        {formatTimestamp(note.atSeconds)}
-      </div>
-      <div className="note-body">
-        {editing ? (
-          <Textarea
-            aria-label="Edit note"
-            autosize
-            minRows={2}
-            maxRows={8}
-            value={body}
-            maxLength={2000}
-            disabled={pending}
-            onChange={(event) => setBody(event.currentTarget.value)}
-          />
-        ) : (
-          <>
-            {note.body && <Text>{note.body}</Text>}
-            <Text size="sm" c="dimmed">
-              {noteColors.find((item) => item.value === note.color)?.label}
-              {note.rating !== null &&
-                ` · ${note.rating}/10 ${momentRatings.find((item) => item.value === note.rating)?.label}`}
-            </Text>
-          </>
-        )}
-        <MomentControls
-          color={note.color}
-          rating={note.rating}
-          disabled={pending}
-          onColor={(color) => saveChanges({ color })}
-          onRating={(rating) => saveChanges({ rating })}
-        />
-        {note.rating !== null && (
-          <Button
-            variant="subtle"
-            size="compact-sm"
-            color="gray"
-            disabled={pending}
-            onClick={() => saveChanges({ rating: null })}
-          >
-            Clear rating
-          </Button>
-        )}
-      </div>
-      <div className="note-actions">
-        {editing ? (
-          <>
-            <Tooltip label="Save changes">
-              <ActionIcon
-                variant="subtle"
-                color="green"
-                disabled={pending}
-                onClick={() => saveChanges({ body: body.trim() })}
-                aria-label="Save changes"
-              >
-                <IconCheck size={16} />
-              </ActionIcon>
-            </Tooltip>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              disabled={pending}
-              onClick={() => {
-                setBody(note.body);
-                setEditing(false);
-              }}
-              aria-label="Cancel editing"
-            >
-              <IconX size={16} />
-            </ActionIcon>
-          </>
-        ) : (
-          <>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              disabled={pending}
-              onClick={() => {
-                setBody(note.body);
-                setEditing(true);
-              }}
-              aria-label="Edit note"
-            >
-              <IconEdit size={16} />
-            </ActionIcon>
-            <ActionIcon
-              variant="subtle"
-              color="red"
-              onClick={() => onDelete(note)}
-              loading={pending}
-              aria-label="Delete note"
-            >
-              <IconTrash size={16} />
-            </ActionIcon>
-          </>
-        )}
-      </div>
-    </article>
-  );
-}
 
 export function LivePage() {
   const jellyfin = useQuery({
@@ -274,12 +131,7 @@ export function LivePage() {
   return (
     <div className="page live-page screening-page">
       <header className="page-heading">
-        <div>
-          <Title order={1}>Keep watching.</Title>
-          <Text c="dimmed" mt="sm">
-            Watch on any screen. Catch a thought without stopping the film.
-          </Text>
-        </div>
+        <Title order={1}>Live</Title>
       </header>
       {jellyfin.data?.configured && (
         <section
@@ -312,7 +164,7 @@ export function LivePage() {
                 justify="space-between"
               >
                 <div>
-                  <Text fw={650}>{session.title ?? "Jellyfin playback"}</Text>
+                  <Text fw={500}>{session.title ?? "Jellyfin playback"}</Text>
                   <Text size="sm" c="dimmed">
                     {session.deviceName} ·{" "}
                     {session.state === "paused" ? "Paused" : "Playing"} ·{" "}
@@ -356,39 +208,38 @@ export function LivePage() {
         </section>
       )}
       <Stack gap="xs" mb="lg">
-        <Select
-          label="Where are you watching?"
-          value={source}
-          allowDeselect={false}
-          data={[
-            {
-              value: "external",
-              label: "Any screen · cinema or another player",
-            },
-            ...(jellyfin.data?.configured
-              ? [
-                  {
-                    value: "jellyfin",
-                    label: jellyfin.data.serverName ?? "Jellyfin",
-                  },
-                ]
-              : []),
-          ]}
-          onChange={(value) => {
-            setSource(value === "jellyfin" ? "jellyfin" : "external");
-            setMovieId(null);
-            setCutId(null);
-            followPlaying.reset();
-          }}
-        />
-        <Text size="sm" c="dimmed">
-          {source === "jellyfin"
-            ? `Browse ${jellyfin.data?.serverName ?? "Jellyfin"}. Subtitles come from your selected media version; playback can follow your device.`
-            : "Find a matching subtitle release and align it with the film on screen."}{" "}
-          {jellyfin.isSuccess && !jellyfin.data.configured && (
-            <a href="/settings">Connect Jellyfin in Settings</a>
-          )}
-        </Text>
+        {jellyfin.data?.configured && (
+          <Select
+            label="Watch source"
+            value={source}
+            allowDeselect={false}
+            data={[
+              {
+                value: "external",
+                label: "Any screen",
+              },
+              ...(jellyfin.data?.configured
+                ? [
+                    {
+                      value: "jellyfin",
+                      label: jellyfin.data.serverName ?? "Jellyfin",
+                    },
+                  ]
+                : []),
+            ]}
+            onChange={(value) => {
+              setSource(value === "jellyfin" ? "jellyfin" : "external");
+              setMovieId(null);
+              setCutId(null);
+              followPlaying.reset();
+            }}
+          />
+        )}
+        {jellyfin.isSuccess && !jellyfin.data.configured && (
+          <Anchor href="/settings" size="sm">
+            Connect Jellyfin
+          </Anchor>
+        )}
         {jellyfin.isPending && (
           <Text size="sm" c="dimmed" role="status">
             Loading your Jellyfin connection… You can use Any screen meanwhile.
@@ -422,11 +273,7 @@ export function LivePage() {
         }}
       >
         <TextInput
-          label={
-            source === "jellyfin"
-              ? `Find a film on ${jellyfin.data?.serverName ?? "Jellyfin"}`
-              : "Find a film for any screen"
-          }
+          label="Film title"
           placeholder="Movie title"
           value={search}
           onChange={(event) => {
@@ -445,13 +292,6 @@ export function LivePage() {
           Search films
         </Button>
       </form>
-      {!query && (
-        <Text c="dimmed" mt="lg">
-          {source === "jellyfin"
-            ? "Search the films available on your Jellyfin server."
-            : "Search for a film and a matching subtitle release for the screen you are watching."}
-        </Text>
-      )}
       {currentSearch && movies.isFetching && (
         <Group mt="xl" role="status" aria-live="polite">
           <Loader size="sm" />
@@ -506,20 +346,18 @@ export function LivePage() {
       {selectedMovie && (
         <section className="screening-selection" aria-label="Choose your cut">
           <Title order={2}>{detail?.title ?? selectedMovie.title}</Title>
-          <Text size="sm" mt="sm">
-            {source === "jellyfin"
-              ? `From ${jellyfin.data?.serverName ?? "Jellyfin"} · exact media versions · device sync option`
-              : "Any screen · choose a subtitle version and align manually"}
-          </Text>
           {(detail?.overview ?? selectedMovie.overview) && (
-            <Text c="dimmed" maw="65ch" mt="sm">
-              {detail?.overview ?? selectedMovie.overview}
-            </Text>
+            <details className="secondary-details">
+              <summary>About this film</summary>
+              <Text c="dimmed">
+                {detail?.overview ?? selectedMovie.overview}
+              </Text>
+            </details>
           )}
           {movie.isFetching && (
             <Group mt="md" role="status" aria-live="polite">
               <Loader size="sm" />
-              <Text c="dimmed">Meta Egg is finding subtitle versions…</Text>
+              <Text c="dimmed">Finding subtitle versions…</Text>
             </Group>
           )}
           {movie.isError && !movie.isFetching && (
@@ -533,9 +371,12 @@ export function LivePage() {
           {detail && !movie.isFetching && !movie.isError && (
             <Stack gap="md" mt="md">
               {detail.savedAt && (
-                <Text size="sm" c="dimmed" role="status">
-                  Saved in Meta Egg
-                </Text>
+                <details className="secondary-details">
+                  <summary>Source details</summary>
+                  <Text size="sm" c="dimmed">
+                    Saved in Meta Egg
+                  </Text>
+                </details>
               )}
               {detail.transcriptStatus &&
                 detail.transcriptStatus.state !== "ready" && (
@@ -565,8 +406,7 @@ export function LivePage() {
                 }))}
               />
               <Text size="sm" c="dimmed">
-                Match the version on screen. Different cuts have separate
-                subtitle timing and notes; runtimes are never stretched.
+                Choose the version you’re watching. Notes keep its timestamps.
               </Text>
               {cuts.length === 0 && !detail.transcriptStatus && (
                 <Text className="form-error">
@@ -654,7 +494,14 @@ function Screening({
   const textarea = useRef<HTMLTextAreaElement>(null);
   const timeline = useQuery({
     queryKey: ["screening-timeline", sourceKey, movie.id, cut.id],
-    queryFn: () => api.screeningTimeline(movie.id, cut.id, source),
+    queryFn: async () => {
+      const media = await api.screeningTimeline(movie.id, cut.id, source);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["library"] }),
+        queryClient.invalidateQueries({ queryKey: ["library-movie"] }),
+      ]);
+      return media;
+    },
     retry: 1,
   });
   const mediaId = timeline.data?.id;
@@ -741,6 +588,8 @@ function Screening({
   const invalidateNotes = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ["notes", mediaId] }),
+      queryClient.invalidateQueries({ queryKey: ["library"] }),
+      queryClient.invalidateQueries({ queryKey: ["library-movie"] }),
       queryClient.invalidateQueries({ queryKey: ["media"] }),
     ]);
   const createNote = useMutation({
@@ -857,13 +706,7 @@ function Screening({
             rel="noopener noreferrer"
           >
             {cut.referenceVideoLabel ?? "Watch reference film"}
-          </Anchor>{" "}
-          · opens separately; keep Introspect on your second screen.
-        </Text>
-      )}
-      {cut.matchingNotes && (
-        <Text size="sm" c="dimmed" mb="md">
-          {cut.matchingNotes}
+          </Anchor>
         </Text>
       )}
       <details
@@ -872,6 +715,11 @@ function Screening({
       >
         <summary>Sync with the screen</summary>
         <Stack gap="md" mt="md">
+          {cut.matchingNotes && (
+            <Text size="sm" c="dimmed">
+              {cut.matchingNotes}
+            </Text>
+          )}
           {movie.provider === "jellyfin" ? (
             <Select
               label="Screening clock"
@@ -892,9 +740,7 @@ function Screening({
             />
           ) : (
             <Text size="sm" c="dimmed">
-              Use the clock or a line of dialogue to align with a cinema, a
-              friend's screen, or any player. Introspect does not connect to or
-              control that screen.
+              Set the clock to match the film on your screen.
             </Text>
           )}
           {mode === "manual" ? (
@@ -957,9 +803,8 @@ function Screening({
                         </Button>
                       ))}
                 </div>
-                <Text size="xs" c="dimmed" mt="xs">
-                  Tap the line when it starts on screen. Check the next line and
-                  adjust if needed.
+                <Text size="sm" c="dimmed" mt="sm">
+                  Tap a line when you hear it.
                 </Text>
               </details>
             </>
@@ -990,10 +835,6 @@ function Screening({
                   clock.
                 </Text>
               )}
-              <Text size="xs" c="dimmed">
-                Playback is observed, never controlled. Polling and client
-                latency can cause drift; use the timing corrections below.
-              </Text>
             </>
           )}
           <Group gap="sm">
@@ -1012,15 +853,10 @@ function Screening({
               +0.5 s
             </Button>
             <Text size="sm" c="dimmed">
-              Subtitle clock correction: {offset > 0 ? "+" : ""}
+              Timing offset: {offset > 0 ? "+" : ""}
               {offset.toFixed(1)} s
             </Text>
           </Group>
-          <Text size="xs" c="dimmed">
-            External screenings need a matching cut and a manual timing anchor.
-            Keep this page open and verify alignment; this is not audio
-            recognition.
-          </Text>
         </Stack>
       </details>
 
@@ -1029,21 +865,18 @@ function Screening({
           {formatTimestamp(position)}
           {runtime !== null && <span> / {formatTimestamp(runtime)}</span>}
         </Text>
-        <Badge
-          color={stale ? "red" : anchor.running ? "green" : "gray"}
-          variant="light"
-        >
+        <Text className="screening-state" c={stale ? "red" : "dimmed"}>
           {stale
             ? "Sync unavailable"
             : mode === "manual"
               ? anchor.running
-                ? "Screening clock running"
+                ? "Live"
                 : "Set the clock to begin"
               : (selectedSession?.state ??
                 (sessions.isPending
                   ? "Finding your player"
                   : "Waiting for playback"))}
-        </Badge>
+        </Text>
       </Group>
       {mode === "jellyfin" && selectedSession && !stale && (
         <Text size="sm" c="dimmed">
@@ -1070,26 +903,13 @@ function Screening({
       <div className="live-grid">
         <Paper className="subtitle-panel" radius="lg">
           <div className="panel-heading">
-            <Text fw={650}>
+            <Text fw={500}>
               {draftPosition !== null
                 ? `Held at ${formatTimestamp(draftPosition)}`
                 : "Live subtitles"}
             </Text>
             {hasTextTrack && transcript.isFetching && <Loader size="xs" />}
           </div>
-          <Select
-            label="Subtitle track"
-            value={trackIndex}
-            onChange={setTrackIndex}
-            disabled={draftPosition !== null || !hasTextTrack}
-            data={cut.subtitles.map((track) => ({
-              value: String(track.index),
-              label: `${track.label}${track.available ? "" : " — image track"}`,
-              disabled: !track.available,
-            }))}
-            placeholder="No text subtitles available"
-            size="xs"
-          />
           <div
             className="subtitle-roll"
             aria-label={
@@ -1129,73 +949,90 @@ function Screening({
               </Button>
             )}
           </div>
-          {transcript.data && (
-            <Text className="subtitle-source">
-              Meta Egg ·{" "}
-              {transcript.data?.data.language?.toUpperCase() ?? "text track"} ·
-              {cut.precision === "subtitle_version"
-                ? "declared subtitle version · verify alignment"
-                : "matched to this media version"}
-            </Text>
-          )}
-          {transcript.data?.data.savedAt && !transcript.isError && (
-            <Text size="xs" c="dimmed" mt="sm" role="status">
-              Transcript saved in Meta Egg
-            </Text>
-          )}
-          {provenance && (
-            <Text size="xs" c="dimmed" mt="sm">
-              {provenance.attribution}
-              {" · "}
-              <Anchor
-                size="xs"
-                href={provenance.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Source
-              </Anchor>
-              {provenance.licenseUrl && (
-                <>
-                  {" · "}
-                  <Anchor
-                    size="xs"
-                    href={provenance.licenseUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    License
-                  </Anchor>
-                </>
-              )}
-              {provenance.termsUrl && (
-                <>
-                  {" · "}
-                  <Anchor
-                    size="xs"
-                    href={provenance.termsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Terms
-                  </Anchor>
-                </>
-              )}
-            </Text>
-          )}
+          <details className="secondary-details subtitle-settings">
+            <summary>Subtitle settings</summary>
+            <Select
+              label="Subtitle track"
+              value={trackIndex}
+              onChange={setTrackIndex}
+              disabled={draftPosition !== null || !hasTextTrack}
+              data={cut.subtitles.map((track) => ({
+                value: String(track.index),
+                label: `${track.label}${track.available ? "" : " — image track"}`,
+                disabled: !track.available,
+              }))}
+              placeholder="No text subtitles available"
+              size="sm"
+            />
+            {transcript.data && (
+              <Text className="subtitle-source">
+                Meta Egg ·{" "}
+                {transcript.data?.data.language?.toUpperCase() ?? "text track"}{" "}
+                ·
+                {cut.precision === "subtitle_version"
+                  ? "declared subtitle version · verify alignment"
+                  : "matched to this media version"}
+              </Text>
+            )}
+            {transcript.data?.data.savedAt && !transcript.isError && (
+              <Text size="sm" c="dimmed" mt="sm" role="status">
+                Transcript saved in Meta Egg
+              </Text>
+            )}
+            {provenance && (
+              <Text size="sm" c="dimmed" mt="sm">
+                {provenance.attribution}
+                {" · "}
+                <Anchor
+                  size="sm"
+                  href={provenance.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Source
+                </Anchor>
+                {provenance.licenseUrl && (
+                  <>
+                    {" · "}
+                    <Anchor
+                      size="sm"
+                      href={provenance.licenseUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      License
+                    </Anchor>
+                  </>
+                )}
+                {provenance.termsUrl && (
+                  <>
+                    {" · "}
+                    <Anchor
+                      size="sm"
+                      href={provenance.termsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Terms
+                    </Anchor>
+                  </>
+                )}
+              </Text>
+            )}
+          </details>
         </Paper>
         <Paper className="composer-panel" radius="lg">
           <div className="panel-heading">
             <div>
-              <Text fw={650}>
+              <Text fw={500}>
                 {draftPosition === null
-                  ? "Catch a thought"
+                  ? "Quick note"
                   : `Note at ${formatTimestamp(draftPosition)}`}
               </Text>
-              <Text size="xs" c="dimmed" mt="xs">
+              <Text size="sm" c="dimmed" mt="xs">
                 {draftPosition === null
-                  ? "One tap saves a color or rating, with any text below."
-                  : `The film continues at ${formatTimestamp(position)}. Save to catch up.`}
+                  ? "Tap a color or score to save."
+                  : `Film continues at ${formatTimestamp(position)}`}
               </Text>
             </div>
           </div>
@@ -1219,9 +1056,9 @@ function Screening({
             />
             <Textarea
               ref={textarea}
-              label="Quick note"
+              aria-label="Quick note"
               className="note-composer"
-              placeholder="What did you notice? Text is optional for pings."
+              placeholder="What did you notice?"
               minRows={3}
               maxRows={8}
               autosize
@@ -1311,12 +1148,7 @@ function Screening({
             </Button>
           </Text>
         )}
-        {notes.data?.notes.length === 0 && (
-          <Text c="dimmed">
-            Your first thought will appear here, at the moment you began
-            writing.
-          </Text>
-        )}
+        {notes.data?.notes.length === 0 && <Text c="dimmed">No notes yet</Text>}
         <div className="notes-list">
           {notes.data?.notes.map((note) => (
             <TimedNote

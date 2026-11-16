@@ -233,6 +233,25 @@ export const mediaListResponseSchema = z.object({
 });
 export type MediaListResponse = z.infer<typeof mediaListResponseSchema>;
 
+export const libraryMovieSchema = mediaSummarySchema.extend({
+  id: z.string().uuid(),
+  versions: z
+    .array(mediaSummarySchema.extend({ id: z.string().uuid() }))
+    .min(1),
+});
+export type LibraryMovie = z.infer<typeof libraryMovieSchema>;
+
+export const libraryListResponseSchema = z.object({
+  items: z.array(libraryMovieSchema),
+});
+export type LibraryListResponse = z.infer<typeof libraryListResponseSchema>;
+
+export const libraryMovieResponseSchema = z.object({
+  movie: libraryMovieSchema,
+  notes: z.array(noteSchema),
+});
+export type LibraryMovieResponse = z.infer<typeof libraryMovieResponseSchema>;
+
 export const subtitleCueSchema = z.object({
   id: z.string(),
   startSeconds: z.number().nonnegative(),

@@ -1,17 +1,18 @@
 # Using Introspect
 
-This guide describes the candidate screening MVP. It is designed for a cinema, a friend's screen, or any player. Meta Egg searches configured online metadata sources and its standalone catalog, which includes the licensed **Sintel** pilot. Online subtitle availability depends on Meta Egg's configured provider and the film's releases. See [verification](docs/development.md#verification).
+Introspect opens to your movie library. Read and export a movie's notes there, or use **Live** to capture moments while watching in a cinema, on a friend's screen, or in any player. Meta Egg supplies the film search and subtitle versions, including its licensed **Sintel** pilot. Online subtitle availability depends on its configured provider and the film's releases. See [verification](docs/development.md#verification).
 
 ## Capability index
 
 | Goal                                                      | Entrypoint                                                    |
 | --------------------------------------------------------- | ------------------------------------------------------------- |
+| Read a movie's notes and duration                         | [Browse the library](#browse-the-library)                     |
+| Export a movie's notes to Obsidian                        | [Export movie notes](#export-movie-notes)                     |
 | Use a shared local profile or separate accounts           | [Access your journal](#access-your-journal)                   |
 | Find a film/cut and synchronize its subtitles             | [Follow playback](#follow-playback)                           |
 | Read dialogue near the playhead                           | [Read subtitles](#read-subtitles)                             |
 | Add, color-code, rate, and edit moments                   | [Write and revisit notes](#write-and-revisit-notes)           |
-| Browse previously opened timelines                        | [Browse the library](#browse-the-library)                     |
-| Label an edition, override runtime, or look up OMDb       | [Manage runtimes and editions](#manage-runtimes-and-editions) |
+| Label an edition or correct its runtime                   | [Manage runtimes and editions](#manage-runtimes-and-editions) |
 | Set language, highlighting window, and note color         | [Set preferences](#set-preferences)                           |
 | Connect Jellyfin and check shared subtitle service status | [Check connections](#check-connections)                       |
 | Preview without a Jellyfin server                         | [Try demo mode](#try-demo-mode)                               |
@@ -22,7 +23,7 @@ The deployment operator chooses the authentication mode in the server environmen
 
 - With authentication disabled, open the app directly. Everyone uses **Local viewer**, including the same device selection, settings, and notes.
 - With authentication enabled, use **Sign in** with your Introspect email and password. To register, choose **Create account**, enter a name, email, and password of at least eight characters, and submit. Registration must be enabled by the operator; the form can still appear when the server rejects sign-ups.
-- Sign out from the user menu or **Settings → Private space**. The UI has no password-reset or account-deletion workflow.
+- Sign out from the user menu or **Settings → Account**. The UI has no password-reset or account-deletion workflow.
 
 These are Introspect accounts, not Jellyfin accounts. Enabling authentication does not transfer Local viewer's existing notes to your new account. Account setup and access boundaries are covered in [operations](docs/operations.md#authentication-and-access).
 
@@ -30,10 +31,10 @@ These are Introspect accounts, not Jellyfin accounts. Enabling authentication do
 
 1. On **Live**, enter a film title and select **Search films**. A saved Jellyfin connection searches your server by default; choose **Any screen** for the online and standalone catalog flow below. Meta Egg looks up metadata in its configured sources; the page shows progress while waiting. Submitting the same title repeats the lookup. The standalone pilot search is **Sintel**.
 2. Select the movie. Its metadata appears while Meta Egg finds subtitle versions. Choose the **Cut / subtitle version** you are watching, then **Open screening**. A version's runtime helps identify it; an unlabeled file is not proof of a theatrical or director's cut. Different cuts retain separate notes and subtitle timing.
-3. Select an available **Subtitle track**. Only text subtitles are supported. If no version can be supplied, the movie remains visible with a reason: the provider is not configured, no release was found, or the source is unavailable. Use **Retry subtitle search** after a temporary failure or configuration change. Opening a screening requires an identified media version. Image-only or missing subtitles do not block playback-following or notes. A matching SRT/VTT can also be supplied through Meta Egg's standalone catalog; Introspect cannot OCR or create missing transcripts.
+3. Open **Subtitle settings** in the screening and select an available **Subtitle track**. Only text subtitles are supported. If no version can be supplied, the movie remains visible with a reason: the provider is not configured, no release was found, or the source is unavailable. Use **Retry subtitle search** after a temporary failure or configuration change. Opening a screening requires an identified media version. Image-only or missing subtitles do not block playback-following or notes. A matching SRT/VTT can also be supplied through Meta Egg's standalone catalog; Introspect cannot OCR or create missing transcripts.
 4. Open **Sync with the screen** and align with the film on your other screen. A supplied **Watch reference film** link opens the matching licensed video separately; it is optional and Introspect does not control it. Source attribution, license links and provider terms come from Meta Egg. A provider terms link does not imply an open license.
 
-With Meta Egg's private screening storage configured, selecting an online movie automatically saves its metadata and available versions; loading a subtitle track saves its timed transcript. **Saved in Meta Egg** and **Transcript saved in Meta Egg** appear only after Meta Egg confirms each save. Searching alone does not save every result. Missing subtitles remain an explicit gap even when the movie is saved. A storage failure shows a retryable error; ask the operator to check the data volume before retrying. These saves belong to Meta Egg's private screening library, separate from Introspect's notes and Meta Egg's canonical graph.
+With Meta Egg's private screening storage configured, selecting an online movie automatically saves its metadata and available versions; loading a subtitle track saves its timed transcript. **Source details → Saved in Meta Egg** and **Subtitle settings → Transcript saved in Meta Egg** appear only after Meta Egg confirms each save. Searching alone does not save every result. Missing subtitles remain an explicit gap even when the movie is saved. A storage failure shows a retryable error; ask the operator to check the data volume before retrying. These saves belong to Meta Egg's private screening library, separate from Introspect's notes and Meta Egg's canonical graph.
 
 For standalone catalog and online discovery entries, the external-screen clock is the only mode. Enter the film's current time as `mm:ss` or `h:mm:ss`, then tap **Sync now** at that moment. At the start, enter `0:00` and tap when the film begins. Alternatively, expand **Sync to a line of dialogue**, search for a line, and tap it when it starts on screen. Use **−0.5 s** or **+0.5 s** to correct drift. Keep the page open; reopening it requires another timing anchor.
 
@@ -49,7 +50,7 @@ A declared subtitle version identifies the timing source; it does not automatica
 
 Jellyfin's **Follow playback** also supports individual TV episodes. Notes belong to that episode's exact media version; Library lists them under **Shows** with the series, season and episode. Jellyfin search accepts episode titles as well as film titles. **Any screen** continues to search films only.
 
-When a text transcript is available, the subtitle roll shows the current line and nearby dialogue from Meta Egg's selected transcript. Image-only and absent tracks have an explicit status; notes still use the selected device or manually anchored clock. Change the track in the screening itself. Loading, missing tracks and upstream failures are shown explicitly, with retry for failed requests. A failed track never silently switches to another cut or to demo content.
+When a text transcript is available, the subtitle roll shows the current line and nearby dialogue from Meta Egg's selected transcript. Image-only and absent tracks have an explicit status; notes still use the selected device or manually anchored clock. Change the track under **Subtitle settings** in the screening. Loading, missing tracks and upstream failures are shown explicitly, with retry for failed requests. A failed track never silently switches to another cut or to demo content.
 
 When you begin a note, the subtitle view stays at that scene while the underlying film clock continues. **Save & catch up**, a color ping, or a rating ping returns to the current line after saving. **Return to live** asks before discarding text or an unsaved ping. No request pauses the movie.
 
@@ -60,7 +61,9 @@ When you begin a note, the subtitle view stays at that scene while the underlyin
 3. A score is for this individual moment, not a whole-film rating. Score-only pings use your default note color. Scores are whole numbers from 1 to 10; an unrated moment has no score, rather than zero.
 4. A failed save retains the text, color, score, and captured timestamp. Use **Retry & catch up** without recapturing the time. Navigation warns before discarding text or an unsaved ping. This is not an offline journal or a draft backup.
 
-Under **Notes in this cut**, each moment shows its time, color meaning, optional text, and score. Its visible color and rating buttons save corrections with one press, preserving its timestamp and other fields. Use **Clear rating** to remove only the score, **Edit note** to add/change text (including on a textless ping), or **Delete note** and confirm to remove the moment; deletion has no undo. Failed text edits stay open for retry. Reopen the same film/cut to revisit moments without playback.
+Under Live's **Notes in this cut**, each moment shows its time, color meaning, optional text, and score. Its visible color and rating buttons save corrections with one press, preserving its timestamp and other fields. Use **Clear rating** to remove only the score, **Edit note** to add/change text (including on a textless ping), or **Delete note** and confirm to remove the moment; deletion has no undo. Failed text edits stay open for retry.
+
+In Library, open the movie card to revisit all its notes without playback. **Edit note** reveals the text field and all color/rating controls inline beside that note. Save with a color, rating, or **Save changes**; cancel to keep the saved note. Leaving with unsaved text asks before discarding it.
 
 The on-page **Color meanings & rating scale** reference explains the conventions below. Expanding it is optional; the action buttons stay available without opening it.
 
@@ -100,27 +103,33 @@ Changing films or cuts cannot move a note draft to another timeline. Timeline id
 
 ## Browse the library
 
-Open **Library** to see titles Introspect has opened or observed for your profile. A title can appear without notes. Use **Live** to search the Meta Egg film catalog; Library is a history of your own timelines.
+**Library** is the home page. It shows movies Introspect has opened or observed for your profile, including movies without notes. Use **Live** to find a film and capture new notes.
 
-- Search by title or series name with **Search titles**.
+- Search by title or series name with **Search library**.
 - Filter with **All**, **Films**, or **Shows**; other videos appear under All.
-- Cards show note count, recent note activity, runtime, and an optional edition label.
+- Each movie has one card across its recognized versions. Titles with different years or conflicting metadata IDs remain separate; incomplete metadata may leave separate cards until the identity is known. TV episodes stay separate by series and episode.
+- Open a card to read all its notes in order of their original film timestamps. Notes from different versions keep their version labels; timestamps are never stretched to a common runtime.
+- The movie page shows its duration. When versions have different durations, their runtimes remain distinct.
 - Use **Clear filters** for an empty search result or **Try again** after a loading error.
 
-The API returns at most the 100 most recently observed timelines. The UI sorts that set by note activity; counts and searches cover only those returned items. There is no pagination, journal export/import, or timeline deletion UI.
+Library includes every stored timeline for your profile and sorts movies by recent note activity. Search, counts, and exports are not limited to the latest 100 timelines. There is no import or timeline deletion UI.
+
+## Export movie notes
+
+Open a movie card and select **Export notes** to download a Markdown file. It contains the movie title, year, duration, and every saved note in a numbered list ordered by film timestamp. Color meanings, optional ratings, textless pings, and original note text are preserved. When a movie has multiple versions, the export identifies the version of each note and keeps its runtime context.
+
+Move the `.md` file into your Obsidian vault or paste its contents into an existing note. The format uses ordinary Markdown without requiring a plugin, frontmatter schema, or special folder. Export does not modify the vault, synchronize later edits, or replace a full application backup.
 
 ## Manage runtimes and editions
 
-These legacy Library controls affect stored timeline metadata; they do not retime Meta Egg transcripts or change the screening clock, which follows the selected cut.
+Movie settings affect the selected version's stored metadata. They do not retime notes or Meta Egg transcripts, or change the screening clock, which follows the selected cut.
 
-1. Open **Library** and select the relevant title card. The **Runtime override** dialog applies to that specific media source.
-2. Enter **Runtime in minutes** (0.1–1,440) and optionally an **Edition label** (up to 80 characters).
-3. Select **Save runtime**. A manual override persists across later playback snapshots and affects the displayed duration and playhead clamp. It does not move note timestamps.
+1. Open a movie card, then **Settings**. Each version has its own form; **Source details** helps distinguish versions when there is more than one.
+2. Enter **Duration in minutes** (0.1–1,440) and optionally a **Version name** (up to 80 characters).
+3. Select **Save changes** in that version's form. A manual override persists across later playback snapshots and affects the displayed duration and playhead clamp. It does not move note timestamps.
 4. To return to the supplied metadata, select **Use automatic**. This also clears the edition label.
 
-For an OMDb lookup, the operator must first configure `OMDB_API_KEY`. In the same dialog, enter the IMDb title ID (for example, `tt0133093`), select **Look up**, verify the returned title/runtime against the actual cut, then select **Save runtime**. Lookup alone does not save anything. On failure, check the ID and server configuration, or enter a manual duration.
-
-OMDb supplies title-level metadata, not an edition-specific duration. It is an explicit lookup, not an automatic background fallback. A saved OMDb value is not preserved like a manual override: a later playback snapshot can replace it with Jellyfin's runtime or clear it if Jellyfin has none. See [runtime behavior](docs/architecture.md#timeline-and-runtime-rules).
+Runtime and edition controls live here so the movie page can focus on notes. The former OMDb lookup is no longer a UI control; its legacy API remains available. See [runtime behavior](docs/architecture.md#timeline-and-runtime-rules).
 
 ## Set preferences
 

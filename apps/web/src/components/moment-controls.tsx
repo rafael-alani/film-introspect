@@ -43,7 +43,7 @@ export function MomentControls({
           </button>
         ))}
       </div>
-      <div className="moment-rating-heading">Rate this moment</div>
+      <div className="moment-rating-heading">Moment score</div>
       <div className="moment-ratings" role="group" aria-label="Moment rating">
         {momentRatings.map((item) => (
           <button
@@ -67,7 +67,7 @@ export function MomentControls({
       <div className="moment-rating-hint">
         {describedRating
           ? `${describedRating.value} · ${describedRating.label}`
-          : "10 Perfect · 5 Ok · 1 Crime against humanity"}
+          : ""}
       </div>
     </div>
   );

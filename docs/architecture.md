@@ -4,20 +4,24 @@ This map describes the repository implementation. Protocol research and its date
 
 ## Code map
 
-| Location                                                                                    | Responsibility                                                                     |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [`apps/web/src/router.tsx`](../apps/web/src/router.tsx), [`pages/`](../apps/web/src/pages/) | Live, Library, and Settings routes; auth gating is in `components/app-layout.tsx`  |
-| [`apps/web/src/api/`](../apps/web/src/api/)                                                 | Credentialed HTTP client, response validation, and Better Auth client              |
-| [`apps/web/src/hooks/use-playback.ts`](../apps/web/src/hooks/use-playback.ts)               | SSE subscription, HTTP fallback, and browser clock interpolation                   |
-| [`apps/api/src/index.ts`](../apps/api/src/index.ts)                                         | Migrate, ensure Local viewer, start Jellyfin sync, serve Hono, shut down           |
-| [`apps/api/src/app.ts`](../apps/api/src/app.ts)                                             | Routes, app authentication, validation, image proxy, SSE, and errors               |
-| [`apps/api/src/services/playback.ts`](../apps/api/src/services/playback.ts)                 | Session filtering/pairing, app snapshots, subtitle choice/cache, connection checks |
-| [`apps/api/src/services/repository.ts`](../apps/api/src/services/repository.ts)             | User-scoped settings, timeline resolution, runtime updates, and note CRUD          |
-| [`apps/api/src/integrations/`](../apps/api/src/integrations/)                               | Meta Egg screening client; legacy Jellyfin, Bazarr and OMDb adapters               |
-| [`apps/api/src/db/`](../apps/api/src/db/), [`drizzle/`](../apps/api/drizzle/)               | SQLite connection, Drizzle schema, and migrations                                  |
-| [`packages/contracts/src/index.ts`](../packages/contracts/src/index.ts)                     | Shared Zod schemas, types, validation limits, and timestamp helpers                |
+| Location                                                                                    | Responsibility                                                                                            |
+| ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [`apps/web/src/router.tsx`](../apps/web/src/router.tsx), [`pages/`](../apps/web/src/pages/) | Library home, movie notes/settings, Live, and app Settings; auth gating is in `components/app-layout.tsx` |
+| [`apps/web/src/api/`](../apps/web/src/api/)                                                 | Credentialed HTTP client, response validation, and Better Auth client                                     |
+| [`apps/web/src/hooks/use-playback.ts`](../apps/web/src/hooks/use-playback.ts)               | SSE subscription, HTTP fallback, and browser clock interpolation                                          |
+| [`apps/api/src/index.ts`](../apps/api/src/index.ts)                                         | Migrate, ensure Local viewer, start Jellyfin sync, serve Hono, shut down                                  |
+| [`apps/api/src/app.ts`](../apps/api/src/app.ts)                                             | Routes, app authentication, validation, image proxy, SSE, and errors                                      |
+| [`apps/api/src/services/playback.ts`](../apps/api/src/services/playback.ts)                 | Session filtering/pairing, app snapshots, subtitle choice/cache, connection checks                        |
+| [`apps/api/src/services/repository.ts`](../apps/api/src/services/repository.ts)             | User-scoped settings, timeline resolution, runtime updates, and note CRUD                                 |
+| [`apps/api/src/services/library.ts`](../apps/api/src/services/library.ts)                   | Movie grouping without modifying stored timelines                                                         |
+| [`apps/web/src/lib/movie-export.ts`](../apps/web/src/lib/movie-export.ts)                   | Portable Markdown export and readable version labels                                                      |
+| [`apps/api/src/integrations/`](../apps/api/src/integrations/)                               | Meta Egg screening client; legacy Jellyfin, Bazarr and OMDb adapters                                      |
+| [`apps/api/src/db/`](../apps/api/src/db/), [`drizzle/`](../apps/api/drizzle/)               | SQLite connection, Drizzle schema, and migrations                                                         |
+| [`packages/contracts/src/index.ts`](../packages/contracts/src/index.ts)                     | Shared Zod schemas, types, validation limits, and timestamp helpers                                       |
 
 ## Data flow
+
+Library is the default route at `/`; `/library` remains an entrypoint. Movie notes and version settings live under `/library/:movieId`, while screening capture lives at `/live`. Library reads stored notes through `/api/library` and `/api/library/:mediaId` without requiring an upstream screening service. Export is generated in the browser from the complete movie response; it does not write to Obsidian or call an integration.
 
 The screening MVP uses `LivePage` → Introspect's `/api/screening/*` proxy → Meta Egg's `/v1/screening/*` API. Metadata, film versions and transcripts all come from Meta Egg. Meta Egg supplies a standalone catalog and online discovery of film metadata and subtitle releases; its optional Jellyfin provider can also supply media sources and observed sessions. Introspect never sends playback control commands. Only sanitized, validated DTOs reach the browser, and every transcript response must match the requested film, cut and track.
 
@@ -27,7 +31,7 @@ Meta Egg can persist online selections and requested transcripts in its private 
 
 `META_EGG_URL` is server-side configuration. The Meta Egg service must be private; the screening endpoints use the normal Introspect account gate, and the server-to-server connection forwards only the selected user’s Jellyfin context for `source=jellyfin`; `source=external` sends no personal credential. Both paths use no-store responses. The browser never receives a saved key. Notes continue to use the existing user-scoped SQLite repository. Runtime provenance is recorded as `meta_egg`, rather than incorrectly implying all metadata originated in Jellyfin.
 
-The older direct Jellyfin, Bazarr and OMDb adapters remain for legacy API clients and Library metadata operations. Settings now manages the personal screening connection and shared subtitle status. They are not used as fallback metadata or subtitles in the screening flow. Original Jellyfin protocol research remains in [integrations](integrations.md).
+The older direct Jellyfin, Bazarr and OMDb adapters remain for legacy API clients. Movie settings expose version-specific runtime and edition corrections; the OMDb lookup is no longer shown in the UI. App Settings manages the personal screening connection and shared subtitle status. The legacy adapters are not fallback metadata or subtitles in the screening flow. Original Jellyfin protocol research remains in [integrations](integrations.md).
 
 ## Playback and subtitle synchronization
 
@@ -55,13 +59,17 @@ The legacy Settings session picker checks `JELLYFIN_USER_ID` (or the saved pairi
 
 The unique timeline key is **app user + server key + item ID + media-source ID**. Personal Jellyfin screening timelines use `jellyfin:` plus the normalized user-selected server URL. External screening timelines use `meta-egg:` plus the configured Meta Egg URL as the server key; their cut IDs are the declared subtitle-version IDs or media-source IDs returned by Meta Egg. Legacy direct Jellyfin timelines retain their original keys, and no automatic migration or cross-cut stretching occurs. For legacy direct playback, the server key is the configured Jellyfin URL with its trailing slash removed, or `demo` when no URL is configured. Changing that URL can create a new timeline identity. A missing media-source ID is stored as an empty string. Notes reference the app-owned timeline UUID; their timestamps are rounded to whole seconds and are never stretched between cuts.
 
-Opening a screening posts `/api/screening/timeline`, re-fetches authoritative cut metadata and creates or reuses its user-owned media row. The existing legacy playback snapshot can also create a media row without a note. Settings reads can create defaults. These GET paths therefore have database side effects; use an isolated database for verification. Library returns the 100 most recently seen media rows for a user, with note counts.
+Opening a screening posts `/api/screening/timeline`, re-fetches authoritative cut metadata and creates or reuses its user-owned media row. The existing legacy playback snapshot can also create a media row without a note. Settings reads can create defaults. These GET paths therefore have database side effects; use an isolated database for verification. Library reads all stored timelines for the user; neither the grouped endpoint nor the legacy media list truncates at 100 rows.
+
+Library grouping is a presentation rule, not a migration or merge. Movies with compatible normalized titles and known years share a card across versions and sources. Normalization ignores case and apostrophe differences and treats other punctuation as word separators. Matching IMDb, TMDB, or TVDB identifiers, or the same stored server/item identity, can establish identity across alternate titles or missing years; conflicting known IDs or different known years prevent grouping. Unknown-year movies without either identity remain separate. Episodes additionally require compatible series, season, and episode context; incomplete context requires matching provider or server/item identity, and contradictory known context stays separate. Generic videos require provider or server/item identity. Server keys remain private to the API.
+
+Every group member must agree with the others, so a row without provider IDs cannot bridge contradictory identities. Group IDs are deterministic member UUIDs, and any owned member UUID can open the group. The movie response includes every version and all its notes, sorted by original `atSeconds`, then `createdAt`, then note ID. Each note retains its `mediaId`. Runtime edits target one version, and different runtimes are kept distinct in the reader and export. No stored timestamp, source key, or ownership changes during grouping or export.
 
 Actual runtime behavior in `repository.ts` is:
 
 - A `manual` override survives incoming playback updates and controls the displayed runtime/clamp.
 - Screening resolution receives the chosen cut's runtime from Meta Egg; the screening clock always uses that cut runtime. Legacy resolution uses `NowPlayingItem.RunTimeTicks` from the Jellyfin snapshot. The code does not separately fetch a media-source duration for runtime resolution.
-- OMDb is a manual lookup-and-save action. Values saved with source `omdb` can be replaced by the next resolution, including by a missing Jellyfin duration; they are not a persistent automatic fallback.
+- The legacy OMDb API supports explicit lookup and save. Values saved with source `omdb` can be replaced by the next resolution, including by a missing Jellyfin duration; they are not a persistent automatic fallback.
 - Clearing an override restores the last stored Jellyfin duration, or unknown. The UI's **Use automatic** action also clears the edition label.
 
 ## Moment annotations
@@ -89,7 +97,8 @@ The route definitions in [`app.ts`](../apps/api/src/app.ts) and payload schemas 
 | `/api/playback`, `/api/playback/events`               | Snapshot and SSE stream                                                      |
 | `/api/playback/sessions`, `/api/playback/subtitles`   | Session list/selection and subtitle cues                                     |
 | `/api/settings`, `/api/connections`                   | Preferences and service status                                               |
-| `/api/media`, `/api/media/:jellyfinItemId/image`      | Observed library and artwork                                                 |
+| `/api/library`, `/api/library/:mediaId`               | Grouped movies, original versions, and all movie notes                       |
+| `/api/media`, `/api/media/:jellyfinItemId/image`      | Stored timeline list and artwork                                             |
 | `/api/media/:mediaId/notes`, `/api/notes/:noteId`     | List/create and update/delete notes                                          |
 | `/api/media/:mediaId/runtime`, `/api/metadata/lookup` | Runtime/edition changes and explicit OMDb lookup                             |
 

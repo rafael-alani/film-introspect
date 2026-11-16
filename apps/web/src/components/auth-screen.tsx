@@ -1,9 +1,5 @@
 import {
   Button,
-  Center,
-  Container,
-  Divider,
-  Paper,
   PasswordInput,
   SegmentedControl,
   Stack,
@@ -11,7 +7,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconArrowRight, IconDeviceTv, IconNotes } from "@tabler/icons-react";
+import { IconArrowRight } from "@tabler/icons-react";
 import { type FormEvent, useState } from "react";
 import { authClient } from "../api/auth";
 import { errorMessage } from "../api/client";
@@ -55,120 +51,79 @@ export function AuthScreen() {
 
   return (
     <main className="auth-page">
-      <div className="auth-grain" />
-      <Container size={1080} className="auth-container">
-        <section className="auth-story">
-          <Brand />
-          <div>
-            <Text className="eyebrow">YOUR SECOND SCREEN</Text>
-            <Title order={1} className="auth-title">
-              Notice what the film makes you <em>feel.</em>
+      <div className="auth-container">
+        <Brand />
+        <section className="auth-card">
+          <Stack gap="lg">
+            <Title order={1}>
+              {mode === "sign-in" ? "Sign in" : "Create account"}
             </Title>
-            <Text className="auth-copy">
-              Introspect follows Jellyfin in real time, placing every thought
-              beside the exact scene that sparked it.
-            </Text>
-          </div>
-          <div className="auth-feature-row">
-            <div>
-              <IconDeviceTv size={18} stroke={1.6} />
-              <Text>Follows playback</Text>
-            </div>
-            <div>
-              <IconNotes size={18} stroke={1.6} />
-              <Text>Time-locked notes</Text>
-            </div>
-          </div>
-        </section>
+            <SegmentedControl
+              fullWidth
+              value={mode}
+              onChange={(value) => {
+                setMode(value as AuthMode);
+                setError(null);
+              }}
+              data={[
+                { value: "sign-in", label: "Sign in" },
+                { value: "create", label: "Create account" },
+              ]}
+            />
 
-        <Center className="auth-form-wrap">
-          <Paper component="section" className="auth-card" radius="xl">
-            <Stack gap="lg">
-              <div>
-                <Text className="eyebrow">WELCOME</Text>
-                <Title order={2}>
-                  {mode === "sign-in"
-                    ? "Return to your notes"
-                    : "Begin a film journal"}
-                </Title>
-                <Text c="dimmed" size="sm" mt={6}>
-                  {mode === "sign-in"
-                    ? "Sign in to resume your live session."
-                    : "Your notes stay private to your account."}
-                </Text>
-              </div>
-
-              <SegmentedControl
-                fullWidth
-                value={mode}
-                onChange={(value) => {
-                  setMode(value as AuthMode);
-                  setError(null);
-                }}
-                data={[
-                  { value: "sign-in", label: "Sign in" },
-                  { value: "create", label: "Create account" },
-                ]}
-              />
-
-              <form onSubmit={submit}>
-                <Stack gap="md">
-                  {mode === "create" && (
-                    <TextInput
-                      label="Name"
-                      placeholder="How should we address you?"
-                      value={name}
-                      onChange={(event) => setName(event.currentTarget.value)}
-                      required
-                      autoComplete="name"
-                    />
-                  )}
+            <form onSubmit={submit}>
+              <Stack gap="md">
+                {mode === "create" && (
                   <TextInput
-                    label="Email"
-                    placeholder="you@example.com"
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.currentTarget.value)}
+                    label="Name"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(event) => setName(event.currentTarget.value)}
                     required
-                    autoComplete="email"
+                    autoComplete="name"
                   />
-                  <PasswordInput
-                    label="Password"
-                    placeholder="At least 8 characters"
-                    value={password}
-                    onChange={(event) => setPassword(event.currentTarget.value)}
-                    required
-                    minLength={8}
-                    autoComplete={
-                      mode === "sign-in" ? "current-password" : "new-password"
-                    }
-                  />
-                  {error && (
-                    <Text role="alert" className="form-error" size="sm">
-                      {error}
-                    </Text>
-                  )}
-                  <Button
-                    type="submit"
-                    size="md"
-                    fullWidth
-                    loading={pending}
-                    rightSection={<IconArrowRight size={17} />}
-                  >
-                    {mode === "sign-in" ? "Sign in" : "Create account"}
-                  </Button>
-                </Stack>
-              </form>
-
-              <Divider label="private by default" labelPosition="center" />
-              <Text ta="center" c="dimmed" size="xs">
-                Jellyfin credentials remain on your Introspect server. By
-                continuing, you agree to keep unusually good notes.
-              </Text>
-            </Stack>
-          </Paper>
-        </Center>
-      </Container>
+                )}
+                <TextInput
+                  label="Email"
+                  placeholder="you@example.com"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.currentTarget.value)}
+                  required
+                  autoComplete="email"
+                />
+                <PasswordInput
+                  label="Password"
+                  description={
+                    mode === "create" ? "At least 8 characters" : undefined
+                  }
+                  value={password}
+                  onChange={(event) => setPassword(event.currentTarget.value)}
+                  required
+                  minLength={8}
+                  autoComplete={
+                    mode === "sign-in" ? "current-password" : "new-password"
+                  }
+                />
+                {error && (
+                  <Text role="alert" className="form-error" size="sm">
+                    {error}
+                  </Text>
+                )}
+                <Button
+                  type="submit"
+                  size="md"
+                  fullWidth
+                  loading={pending}
+                  rightSection={<IconArrowRight size={17} />}
+                >
+                  {mode === "sign-in" ? "Sign in" : "Create account"}
+                </Button>
+              </Stack>
+            </form>
+          </Stack>
+        </section>
+      </div>
     </main>
   );
 }

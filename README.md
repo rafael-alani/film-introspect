@@ -1,6 +1,8 @@
 # Introspect
 
-Introspect is a dim second-screen journal for films. Search Meta Egg, choose the matching cut and transcript, then anchor the subtitle clock to the film playing in a cinema, on a friend's screen, or in any player. Jellyfin following is an optional mode for Jellyfin-backed catalog entries. Beginning a note holds the dialogue and timestamp while the film keeps moving; saving returns immediately to live subtitles. One-tap color and 1–10 rating pings capture individual moments, with optional text.
+Introspect is a film notebook built around your library. Open a movie to read its notes in film-time order, see its duration, or export the notes as Markdown for Obsidian. Versions of the same movie share a card while retaining their original timestamps and settings.
+
+Use **Live** to capture notes while watching. Search Meta Egg, choose the matching cut and transcript, then anchor the subtitle clock to the film on any screen. Jellyfin following is optional. Beginning a note holds the dialogue and timestamp while the film keeps moving; saving returns to live subtitles. One-tap color and 1–10 rating pings capture individual moments, with optional text.
 
 This Bun workspace contains a React/Vite web app, a Hono API, shared Zod contracts, and SQLite storage. See the [user guide](USER_DOC.md#capability-index) for supported capabilities, workflows, and restrictions.
 
@@ -19,7 +21,7 @@ Edit `.env` before starting. Set `META_EGG_URL` to your private Meta Egg API. Me
 bun dev
 ```
 
-Open [localhost:5173](http://localhost:5173). Search for a film on **Live**, choose its cut, then select **Open screening** and **Sync with the screen**. The API listens on port 3001; Vite proxies `/api` to it. API startup applies migrations automatically.
+Open [localhost:5173](http://localhost:5173) to see **Library**. To add notes, open **Live**, search for a film, choose its cut, then select **Open screening** and **Sync with the screen**. The API listens on port 3001; Vite proxies `/api` to it. API startup applies migrations automatically.
 
 `APP_AUTH_ENABLED=false` is the default: everyone who can reach the app shares the **Local viewer** profile and its notes. Enable accounts for separate collections; Introspect credentials are separate from Jellyfin credentials. See [authentication and access](docs/operations.md#authentication-and-access) before exposing the app beyond a trusted network.
 

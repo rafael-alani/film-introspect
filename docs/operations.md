@@ -80,24 +80,24 @@ Before an update, record the application revision (`git rev-parse HEAD`), back u
 
 ## Diagnostics
 
-| Symptom                                   | Check and recovery                                                                                                                                                                              |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API fails at startup                      | Read API logs for environment validation, secret length, migrations, or data-directory permissions. Confirm the configured database path.                                                       |
-| Web returns 502 or app cannot load config | Check API startup and Nginx connectivity to `api:3001`; Compose waits for the API healthcheck; inspect an unhealthy API first. Locally, verify the Vite proxy target.                           |
-| Sign-in or sign-up fails                  | Confirm the exact public origin/auth URL, HTTPS/cookies, and registration setting. Reload after changing auth mode; the browser caches app config.                                              |
-| Jellyfin says Not set or Unavailable      | Check both URL/key, API-to-Jellyfin network reachability, and the status message/logs. Recreate the API after environment changes.                                                              |
-| No sessions or Live stays idle            | Start playback on the selected device, refresh the session list, and verify user/device pairing and `JELLYFIN_USER_ID`. An idle pinned device will not fall back to another device.             |
-| Playback lags or shows polling            | Inspect `/api/playback/events` in the browser and proxy buffering/timeouts. The browser-to-API SSE link is separate from the API-to-Jellyfin WebSocket; REST polling can mask a socket failure. |
-| Subtitle roll is empty                    | Confirm Jellyfin exposes a text stream for the selected source. Refresh Jellyfin metadata after adding a sidecar; allow time for embedded-text extraction.                                      |
-| Replaced subtitles still show old text    | The server cache lasts six hours per item/source/stream. Reloading the browser alone does not clear it. Restart the API to clear the cache if necessary, then reload Live.                      |
-| OMDb badge is Connected but lookup fails  | The badge checks only key presence. Perform a lookup to check validity/reachability and inspect its error.                                                                                      |
-| Library/notes seem lost                   | Check auth mode/account, database volume/path, configured Jellyfin URL, and media source before changing data. Library exposes only the latest 100 observed timelines.                          |
+| Symptom                                   | Check and recovery                                                                                                                                                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| API fails at startup                      | Read API logs for environment validation, secret length, migrations, or data-directory permissions. Confirm the configured database path.                                                              |
+| Web returns 502 or app cannot load config | Check API startup and Nginx connectivity to `api:3001`; Compose waits for the API healthcheck; inspect an unhealthy API first. Locally, verify the Vite proxy target.                                  |
+| Sign-in or sign-up fails                  | Confirm the exact public origin/auth URL, HTTPS/cookies, and registration setting. Reload after changing auth mode; the browser caches app config.                                                     |
+| Jellyfin says Not set or Unavailable      | Check both URL/key, API-to-Jellyfin network reachability, and the status message/logs. Recreate the API after environment changes.                                                                     |
+| No sessions or Live stays idle            | Start playback on the selected device, refresh the session list, and verify user/device pairing and `JELLYFIN_USER_ID`. An idle pinned device will not fall back to another device.                    |
+| Playback lags or shows polling            | Inspect `/api/playback/events` in the browser and proxy buffering/timeouts. The browser-to-API SSE link is separate from the API-to-Jellyfin WebSocket; REST polling can mask a socket failure.        |
+| Subtitle roll is empty                    | Confirm Jellyfin exposes a text stream for the selected source. Refresh Jellyfin metadata after adding a sidecar; allow time for embedded-text extraction.                                             |
+| Replaced subtitles still show old text    | The server cache lasts six hours per item/source/stream. Reloading the browser alone does not clear it. Restart the API to clear the cache if necessary, then reload Live.                             |
+| Legacy OMDb lookup fails                  | Verify key configuration and inspect the API lookup error. The current movie settings page uses manual runtime corrections instead.                                                                    |
+| Library/notes seem lost                   | Check auth mode/account, database volume/path, and stored media identity before changing data. Library includes all owned timelines, grouped into movie cards; each note retains its original version. |
 
 API request logging goes to stdout; unhandled errors go to stderr. Review logs before sharing them because upstream error bodies can contain service details. More detail on stale snapshots, runtime overrides, and scope is in [architecture](architecture.md).
 
 ## Backup and recovery
 
-There is no built-in backup, export, scheduled backup, or restore UI. Preserve the full SQLite data directory (including any `-wal` and `-shm` files), application revision, and environment configuration. Protect backups because they contain notes, account/session data, and potentially service secrets. Back up Jellyfin/Bazarr media and configuration through their own procedures.
+Movie pages can export notes as Markdown, but this is not an application backup. There is no built-in database backup, scheduled backup, or restore UI. Preserve the full SQLite data directory (including any `-wal` and `-shm` files), application revision, and environment configuration. Protect backups because they contain notes, account/session data, and potentially service secrets. Back up Jellyfin/Bazarr media and configuration through their own procedures.
 
 ### Offline backup
 
@@ -179,7 +179,7 @@ console.table(
 );
 ```
 
-Compare the returned count, text, timestamps, and colors with known notes from the backup's owner and edition. Record which timeline and account were checked. The media list contains only the 100 most recently observed timelines, so its length is not a total database count. If the expected timeline is absent, use a previously recorded timeline UUID for the notes request; otherwise this check is incomplete. Do not create a replacement timeline or change pairing to make missing data appear.
+Compare the returned count, text, timestamps, and colors with known notes from the backup's owner and edition. Record which timeline and account were checked. The media list contains all timelines for the signed-in owner; its length is not a count of grouped movies or other users' data. If the expected timeline is absent, use a previously recorded timeline UUID for the notes request; otherwise this check is incomplete. Do not create a replacement timeline or change pairing to make missing data appear.
 
 A `401` means the app session is missing or expired; sign in again on the restore deployment. A `404` means the UUID is absent or belongs to another profile; recheck the account, UUID, and restored database. An empty notes array is only expected for a timeline known to have no notes. This check verifies the sampled stored records; it does not establish playback synchronization or a complete restore by itself.
 

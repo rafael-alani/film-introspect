@@ -12,6 +12,8 @@ import {
   connectionsResponseSchema,
   createNoteInputSchema,
   mediaListResponseSchema,
+  libraryListResponseSchema,
+  libraryMovieResponseSchema,
   mediaSchema,
   metadataLookupInputSchema,
   metadataLookupResponseSchema,
@@ -29,6 +31,8 @@ import {
   type CreateNoteInput,
   type Media,
   type MediaListResponse,
+  type LibraryListResponse,
+  type LibraryMovieResponse,
   type MetadataLookupResponse,
   type Note,
   type NotesResponse,
@@ -209,6 +213,13 @@ export const api = {
     request("/api/playback/subtitles", subtitlesResponseSchema),
   media: (): Promise<MediaListResponse> =>
     request("/api/media", mediaListResponseSchema),
+  library: (): Promise<LibraryListResponse> =>
+    request("/api/library", libraryListResponseSchema),
+  libraryMovie: (mediaId: string): Promise<LibraryMovieResponse> =>
+    request(
+      `/api/library/${encodeURIComponent(mediaId)}`,
+      libraryMovieResponseSchema,
+    ),
   notes: (mediaId: string): Promise<NotesResponse> =>
     request(
       `/api/media/${encodeURIComponent(mediaId)}/notes`,

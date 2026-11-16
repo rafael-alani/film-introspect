@@ -1,6 +1,10 @@
 import { afterAll, expect, test } from "bun:test";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { resolve } from "node:path";
+import {
+  libraryListResponseSchema,
+  libraryMovieResponseSchema,
+} from "@film-introspect/contracts";
 
 process.env.DATABASE_PATH = ":memory:";
 process.env.META_EGG_URL = "http://meta-egg.test";
@@ -25,6 +29,137 @@ const realFetch = globalThis.fetch;
 afterAll(() => {
   globalThis.fetch = realFetch;
   sqlite.close();
+});
+
+test("library returns every movie and every owned note across editions without changing timelines", async () => {
+  const { mediaItems, notes } = await import("../db/schema");
+  const { getLibraryMovie, updateRuntime } = await import("./repository");
+  const primary = crypto.randomUUID();
+  const alternate = crypto.randomUUID();
+  const privateId = crypto.randomUUID();
+  const movie = {
+    userId: LOCAL_APP_USER.id,
+    title: "At Eternity's Gate",
+    year: 2018,
+    kind: "movie" as const,
+  };
+  db.insert(mediaItems)
+    .values([
+      {
+        ...movie,
+        id: primary,
+        jellyfinServerKey: "https://old-screen.test",
+        jellyfinItemId: "movie",
+        mediaSourceId: "theatrical",
+        runtimeSeconds: 6660,
+        lastSeenAt: new Date(0),
+      },
+      {
+        ...movie,
+        id: alternate,
+        title: "At Eternity’s Gate",
+        jellyfinServerKey: "jellyfin:https://new-screen.test",
+        jellyfinItemId: "another-id",
+        mediaSourceId: "extended",
+        runtimeSeconds: 6780,
+        lastSeenAt: new Date(0),
+      },
+      {
+        ...movie,
+        id: privateId,
+        userId: "second-viewer",
+        jellyfinItemId: "movie",
+        mediaSourceId: "private",
+      },
+      ...Array.from({ length: 105 }, (_, index) => ({
+        ...movie,
+        id: crypto.randomUUID(),
+        title: `Library fixture ${index}`,
+        jellyfinItemId: `fixture-${index}`,
+        lastSeenAt: new Date(),
+      })),
+    ])
+    .run();
+  const first = crypto.randomUUID();
+  const second = crypto.randomUUID();
+  const last = crypto.randomUUID();
+  db.insert(notes)
+    .values([
+      {
+        id: last,
+        userId: LOCAL_APP_USER.id,
+        mediaId: primary,
+        atSeconds: 120,
+        body: "Later scene",
+        color: "amber",
+      },
+      {
+        id: second,
+        userId: LOCAL_APP_USER.id,
+        mediaId: primary,
+        atSeconds: 30,
+        body: "Same scene, later note",
+        createdAt: new Date(2000),
+        color: "sky",
+      },
+      {
+        id: first,
+        userId: LOCAL_APP_USER.id,
+        mediaId: alternate,
+        atSeconds: 30,
+        body: "",
+        rating: 8,
+        createdAt: new Date(1000),
+        color: "orange",
+      },
+      {
+        id: crypto.randomUUID(),
+        userId: "second-viewer",
+        mediaId: privateId,
+        atSeconds: 0,
+        body: "Private thought",
+        color: "amber",
+      },
+    ])
+    .run();
+
+  const listResponse = await app.request("/api/library");
+  expect(listResponse.status).toBe(200);
+  const list = libraryListResponseSchema.parse(await listResponse.json());
+  expect(list.items).toHaveLength(106);
+  expect(
+    list.items.find(
+      (item) => item.year === 2018 && item.title.startsWith("At Eternity"),
+    )?.noteCount,
+  ).toBe(3);
+  const detailResponse = await app.request(`/api/library/${alternate}`);
+  expect(detailResponse.status).toBe(200);
+  const detail = libraryMovieResponseSchema.parse(await detailResponse.json());
+  expect(detail.movie.versions).toHaveLength(2);
+  expect(detail.notes.map((note) => note.id)).toEqual([first, second, last]);
+  expect(detail.notes[0]?.mediaId).toBe(alternate);
+  expect(detail.notes[0]?.rating).toBe(8);
+  expect(detail.notes[0]?.body).toBe("");
+  expect(await getLibraryMovie(LOCAL_APP_USER.id, primary)).toEqual(detail);
+  expect((await app.request(`/api/library/${privateId}`)).status).toBe(404);
+  expect(await getLibraryMovie("second-viewer", primary)).toBeNull();
+  await updateRuntime(LOCAL_APP_USER.id, primary, {
+    runtimeSeconds: 7000,
+    editionLabel: "Director's cut",
+    source: "manual",
+  });
+  const updated = await getLibraryMovie(LOCAL_APP_USER.id, alternate);
+  expect(
+    updated?.movie.versions.find((item) => item.id === primary)?.runtimeSeconds,
+  ).toBe(7000);
+  expect(
+    updated?.movie.versions.find((item) => item.id === alternate)
+      ?.runtimeSeconds,
+  ).toBe(6780);
+  expect(updated?.notes).toEqual(detail.notes);
+  expect(sqlite.query("PRAGMA integrity_check").get()).toEqual({
+    integrity_check: "ok",
+  });
 });
 
 test("personal credentials are encrypted, owner-bound and never returned; failed replacement keeps previous key", async () => {

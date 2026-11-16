@@ -27,6 +27,7 @@ const queryClient = new QueryClient({
 
 const theme = createTheme({
   primaryColor: "amber",
+  autoContrast: true,
   primaryShade: 5,
   colors: {
     amber: [
@@ -46,11 +47,12 @@ const theme = createTheme({
   fontFamily:
     'Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   headings: {
-    fontFamily: 'Iowan Old Style, Baskerville, "Times New Roman", serif',
+    fontFamily:
+      'Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     fontWeight: "500",
   },
   components: {
-    Button: Button.extend({ defaultProps: { radius: "xl" } }),
+    Button: Button.extend({ defaultProps: { radius: "md" } }),
     Paper: Paper.extend({ defaultProps: { bg: "var(--surface)" } }),
     TextInput: TextInput.extend({ defaultProps: { radius: "md" } }),
     PasswordInput: PasswordInput.extend({ defaultProps: { radius: "md" } }),

@@ -20,8 +20,8 @@ import { AuthScreen } from "./auth-screen";
 import { Brand } from "./brand";
 
 const navItems = [
-  { to: "/", label: "Live", icon: IconPlayerPlay },
-  { to: "/library", label: "Library", icon: IconBook2 },
+  { to: "/", label: "Library", icon: IconBook2 },
+  { to: "/live", label: "Live", icon: IconPlayerPlay },
   { to: "/settings", label: "Settings", icon: IconSettings },
 ] as const;
 
@@ -80,13 +80,20 @@ export function AppLayout() {
   return (
     <div className="app-frame">
       <header className="topbar">
-        <Brand />
+        <Link to="/" className="brand-link">
+          <Brand />
+        </Link>
         <nav className="desktop-nav" aria-label="Primary navigation">
           {navItems.map(({ to, label }) => (
             <Link
               key={to}
               to={to}
-              className={pathname === to ? "nav-link active" : "nav-link"}
+              className={
+                pathname === to ||
+                (to === "/" && pathname.startsWith("/library"))
+                  ? "nav-link active"
+                  : "nav-link"
+              }
             >
               {label}
             </Link>
@@ -94,7 +101,10 @@ export function AppLayout() {
         </nav>
         <Menu position="bottom-end" width={220}>
           <Menu.Target>
-            <UnstyledButton className="user-menu-button">
+            <UnstyledButton
+              className="user-menu-button"
+              aria-label="Account menu"
+            >
               <Avatar size={31} radius="xl" color="amber">
                 {initials(user.name, user.email)}
               </Avatar>
@@ -105,11 +115,7 @@ export function AppLayout() {
             </UnstyledButton>
           </Menu.Target>
           <Menu.Dropdown>
-            <Menu.Label>
-              {authEnabled
-                ? user.email
-                : "Local prototype · app login disabled"}
-            </Menu.Label>
+            <Menu.Label>{authEnabled ? user.email : "Local viewer"}</Menu.Label>
             <Menu.Item
               leftSection={<IconSettings size={15} />}
               onClick={() => void navigate({ to: "/settings" })}
@@ -145,7 +151,9 @@ export function AppLayout() {
             key={to}
             to={to}
             className={
-              pathname === to ? "mobile-nav-link active" : "mobile-nav-link"
+              pathname === to || (to === "/" && pathname.startsWith("/library"))
+                ? "mobile-nav-link active"
+                : "mobile-nav-link"
             }
           >
             <Icon size={20} stroke={1.7} />

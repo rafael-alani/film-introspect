@@ -83,7 +83,7 @@ The intended runtime authority in the original research was:
 2. explicit per-source user override;
 3. optional external title runtime only when local runtime is missing.
 
-The current code differs: a manual override takes precedence, and OMDb is an explicit lookup/save operation whose result is not preserved across playback resolution. The implementation reads runtime from the session's `NowPlayingItem`; it does not separately resolve file duration from media-source metadata. [Timeline and runtime rules](architecture.md#timeline-and-runtime-rules) are authoritative for implemented behavior, and the [user guide](../USER_DOC.md#manage-runtimes-and-editions) describes the available controls.
+The current code differs: a manual override takes precedence, and the legacy OMDb API is an explicit lookup/save operation whose result is not preserved across playback resolution. Movie settings now expose manual runtime and edition corrections without an OMDb lookup control. The implementation reads runtime from the session's `NowPlayingItem`; it does not separately resolve file duration from media-source metadata. [Timeline and runtime rules](architecture.md#timeline-and-runtime-rules) are authoritative for implemented behavior, and the [user guide](../USER_DOC.md#manage-runtimes-and-editions) describes the available controls.
 
 OMDb's `Runtime` is a rounded title-level string such as `"136 min"`. It is not edition-specific, and OMDb is independent of IMDb. IMDb's downloadable non-commercial TSV similarly describes a title's primary runtime, while IMDb's supported online GraphQL product is licensed through AWS Data Exchange. Neither solves cut detection.
 

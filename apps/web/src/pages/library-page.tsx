@@ -1,294 +1,115 @@
-import {
-  Badge,
-  Button,
-  Group,
-  Modal,
-  NumberInput,
-  Paper,
-  SegmentedControl,
-  Skeleton,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-} from "@mantine/core";
-import {
-  IconClockEdit,
-  IconMovie,
-  IconNotes,
-  IconSearch,
-  IconSparkles,
-} from "@tabler/icons-react";
-import {
-  formatTimestamp,
-  type MediaSummary,
-  type UpdateRuntimeInput,
-} from "@film-introspect/contracts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { Button, SegmentedControl, Skeleton, TextInput } from "@mantine/core";
+import { IconArrowUpRight, IconSearch } from "@tabler/icons-react";
+import { type LibraryMovie } from "@film-introspect/contracts";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { api, apiAssetUrl, errorMessage } from "../api/client";
 
-type KindFilter = "all" | "movie" | "episode";
-
-const runtimeSourceLabels: Record<MediaSummary["runtimeSource"], string> = {
-  jellyfin: "Jellyfin",
-  meta_egg: "Meta Egg",
-  manual: "Manual",
-  omdb: "OMDb",
-  unknown: "Unknown",
-};
-
-function detailLine(media: MediaSummary): string {
-  if (media.kind === "episode") {
-    const episode =
-      media.episodeNumber === null
-        ? null
-        : `E${String(media.episodeNumber).padStart(2, "0")}`;
-    const season =
-      media.seasonNumber === null
-        ? null
-        : `S${String(media.seasonNumber).padStart(2, "0")}`;
+export function movieContext(movie: LibraryMovie): string {
+  if (movie.kind === "episode") {
     return [
-      media.contextTitle,
-      season && episode ? `${season}${episode}` : null,
-      media.editionLabel,
+      movie.contextTitle,
+      movie.seasonNumber !== null && movie.episodeNumber !== null
+        ? `S${movie.seasonNumber} · E${movie.episodeNumber}`
+        : null,
     ]
       .filter(Boolean)
       .join(" · ");
   }
-  return [
-    media.year,
-    media.kind === "video" ? "Video" : "Film",
-    media.editionLabel,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  return movie.year?.toString() ?? "";
 }
 
-function formatRelative(value: string | null): string {
-  if (!value) return "No notes yet";
-  const days = Math.floor(
-    (Date.now() - new Date(value).getTime()) / 86_400_000,
+export function movieDuration(movie: LibraryMovie): string {
+  const durations = new Set(
+    movie.versions.map((version) => version.runtimeSeconds),
   );
-  if (days <= 0) return "Noted today";
-  if (days === 1) return "Noted yesterday";
-  if (days < 30) return `Noted ${days} days ago`;
-  return `Noted ${new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  if (durations.size > 1) return "Multiple runtimes";
+  const seconds = movie.runtimeSeconds;
+  if (!seconds) return "Duration unavailable";
+  const minutes = Math.round(seconds / 60);
+  return minutes >= 60
+    ? `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+    : `${minutes} min`;
 }
 
 export function LibraryPage() {
-  const queryClient = useQueryClient();
-  const mediaQuery = useQuery({ queryKey: ["media"], queryFn: api.media });
+  const library = useQuery({ queryKey: ["library"], queryFn: api.library });
   const [search, setSearch] = useState("");
-  const [kind, setKind] = useState<KindFilter>("all");
-  const [selected, setSelected] = useState<MediaSummary | null>(null);
-  const [runtimeMinutes, setRuntimeMinutes] = useState<string | number>("");
-  const [runtimeOrigin, setRuntimeOrigin] = useState<"manual" | "omdb">(
-    "manual",
+  const [kind, setKind] = useState("all");
+  const items = (library.data?.items ?? []).filter(
+    (movie) =>
+      (kind === "all" || movie.kind === kind) &&
+      `${movie.title} ${movie.contextTitle ?? ""}`
+        .toLocaleLowerCase()
+        .includes(search.trim().toLocaleLowerCase()),
   );
-  const [editionLabel, setEditionLabel] = useState("");
-  const [imdbId, setImdbId] = useState("");
-  const [metadataFeedback, setMetadataFeedback] = useState<string | null>(null);
-  const [runtimeError, setRuntimeError] = useState<string | null>(null);
-
-  const chooseMedia = (media: MediaSummary) => {
-    setSelected(media);
-    setRuntimeMinutes(
-      media.runtimeSeconds === null
-        ? ""
-        : Math.round((media.runtimeSeconds / 60) * 10) / 10,
-    );
-    setRuntimeOrigin(media.runtimeSource === "omdb" ? "omdb" : "manual");
-    setEditionLabel(media.editionLabel ?? "");
-    setImdbId(
-      media.providerIds.Imdb ??
-        media.providerIds.IMDb ??
-        media.providerIds.imdb ??
-        "",
-    );
-    setMetadataFeedback(null);
-    setRuntimeError(null);
-  };
-
-  const updateRuntime = useMutation({
-    mutationFn: (input: UpdateRuntimeInput) =>
-      api.updateRuntime(selected?.id as string, input),
-    onSuccess: async () => {
-      setSelected(null);
-      await queryClient.invalidateQueries({ queryKey: ["media"] });
-    },
-    onError: (cause) => setRuntimeError(errorMessage(cause)),
-  });
-
-  const lookupMetadata = useMutation({
-    mutationFn: () => api.lookupMetadata(imdbId.trim()),
-    onSuccess: (match) => {
-      if (match.runtimeSeconds !== null) {
-        setRuntimeMinutes(Math.round((match.runtimeSeconds / 60) * 10) / 10);
-        setRuntimeOrigin("omdb");
-      }
-      setMetadataFeedback(
-        match.runtimeSeconds === null
-          ? `${match.title} has no OMDb runtime.`
-          : `${match.title}${match.year ? ` (${match.year})` : ""} · ${Math.round(match.runtimeSeconds / 60)} min from OMDb`,
-      );
-    },
-    onError: (cause) => setMetadataFeedback(errorMessage(cause)),
-  });
-
-  const items = useMemo(() => {
-    const needle = search.trim().toLocaleLowerCase();
-    return [...(mediaQuery.data?.items ?? [])]
-      .filter((item) => kind === "all" || item.kind === kind)
-      .filter(
-        (item) =>
-          !needle ||
-          `${item.title} ${item.contextTitle ?? ""}`
-            .toLocaleLowerCase()
-            .includes(needle),
-      )
-      .sort((a, b) => {
-        if (!a.lastNotedAt && !b.lastNotedAt) return 0;
-        if (!a.lastNotedAt) return 1;
-        if (!b.lastNotedAt) return -1;
-        return b.lastNotedAt.localeCompare(a.lastNotedAt);
-      });
-  }, [kind, mediaQuery.data?.items, search]);
+  const filtered = Boolean(search || kind !== "all");
+  const mixedFormats = library.data?.items.some(
+    (movie) => movie.kind !== "movie",
+  );
 
   return (
     <div className="page library-page">
-      <header className="page-heading">
-        <div>
-          <Text className="eyebrow">YOUR COLLECTION</Text>
-          <Title order={1}>Film journal</Title>
-          <Text c="dimmed" mt={6}>
-            Thoughts you caught while the film kept moving.
-          </Text>
-        </div>
-        <Paper className="library-stat" radius="lg">
-          <IconNotes size={18} />
-          <div>
-            <Text fw={700}>
-              {mediaQuery.data?.items.reduce(
-                (sum, item) => sum + item.noteCount,
-                0,
-              ) ?? 0}
-            </Text>
-            <Text size="xs" c="dimmed">
-              observations
-            </Text>
-          </div>
-        </Paper>
+      <header className="library-heading">
+        <h1>Library</h1>
+        <Button component={Link} to="/live">
+          Add notes
+        </Button>
       </header>
-
       <div className="library-controls">
         <TextInput
           className="library-search"
-          leftSection={<IconSearch size={16} />}
-          placeholder="Search titles"
+          leftSection={<IconSearch size={18} />}
+          placeholder="Search library"
+          aria-label="Search library"
           value={search}
           onChange={(event) => setSearch(event.currentTarget.value)}
-          aria-label="Search titles"
         />
-        <SegmentedControl
-          value={kind}
-          onChange={(value) => setKind(value as KindFilter)}
-          data={[
-            { value: "all", label: "All" },
-            { value: "movie", label: "Films" },
-            { value: "episode", label: "Shows" },
-          ]}
-        />
+        {mixedFormats && (
+          <SegmentedControl
+            value={kind}
+            onChange={setKind}
+            aria-label="Media type"
+            data={[
+              { value: "all", label: "All" },
+              { value: "movie", label: "Films" },
+              { value: "episode", label: "Shows" },
+            ]}
+          />
+        )}
       </div>
-
-      {mediaQuery.isLoading ? (
-        <div className="media-grid">
+      {library.isPending ? (
+        <div className="media-grid" aria-label="Loading library">
           {Array.from({ length: 6 }, (_, index) => (
-            <Skeleton key={index} height={310} radius="xl" />
+            <Skeleton key={index} height={184} radius="md" />
           ))}
         </div>
-      ) : mediaQuery.isError ? (
-        <Paper className="state-card" radius="xl">
-          <Text fw={650}>The library could not be loaded.</Text>
-          <Text c="dimmed" size="sm">
-            {errorMessage(mediaQuery.error)}
-          </Text>
-          <Button variant="light" onClick={() => void mediaQuery.refetch()}>
+      ) : library.isError ? (
+        <div className="library-state" role="alert">
+          <h2>Could not load your library</h2>
+          <p>{errorMessage(library.error)}</p>
+          <Button variant="default" onClick={() => void library.refetch()}>
             Try again
           </Button>
-        </Paper>
-      ) : items.length > 0 ? (
+        </div>
+      ) : items.length ? (
         <div className="media-grid">
-          {items.map((media) => (
-            <button
-              key={
-                media.id ??
-                `${media.jellyfinItemId}:${media.mediaSourceId ?? ""}`
-              }
-              type="button"
-              className="media-card"
-              onClick={() => chooseMedia(media)}
-            >
-              <div className="media-poster">
-                {media.imageUrl ? (
-                  <img
-                    src={apiAssetUrl(media.imageUrl) ?? undefined}
-                    alt=""
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="media-poster-placeholder">
-                    <IconMovie size={34} stroke={1.2} />
-                  </div>
-                )}
-                <div className="media-poster-gradient" />
-                <Badge className="media-kind" variant="filled" color="dark">
-                  {media.kind === "episode" ? "Series" : media.kind}
-                </Badge>
-                <div className="media-note-count">
-                  <IconNotes size={14} />
-                  {media.noteCount}
-                </div>
-              </div>
-              <div className="media-card-copy">
-                <Text fw={650} lineClamp={1}>
-                  {media.title}
-                </Text>
-                <Text c="dimmed" size="sm" lineClamp={1}>
-                  {detailLine(media)}
-                </Text>
-                <div className="media-meta-row">
-                  <Text size="xs" c="dimmed">
-                    {formatRelative(media.lastNotedAt)}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {media.runtimeSeconds
-                      ? formatTimestamp(media.runtimeSeconds)
-                      : "Runtime unknown"}
-                  </Text>
-                </div>
-              </div>
-            </button>
+          {items.map((movie) => (
+            <MovieCard key={movie.id} movie={movie} />
           ))}
         </div>
       ) : (
-        <Paper className="state-card library-empty" radius="xl">
-          <div className="empty-icon">
-            <IconSparkles size={26} />
-          </div>
-          <Title order={2}>
-            {search || kind !== "all"
-              ? "No matching titles"
-              : "Your journal starts with play"}
-          </Title>
-          <Text c="dimmed" maw={440} ta="center">
-            {search || kind !== "all"
-              ? "Try a different search or show every format."
-              : "Start something in Jellyfin and add a timed note. It will be waiting here afterward."}
-          </Text>
-          {(search || kind !== "all") && (
+        <div className="library-state">
+          <h2>{filtered ? "No matching titles" : "Your library is empty"}</h2>
+          <p>
+            {filtered
+              ? "Try another title or clear the filters."
+              : "Open a film in Live to start your notes."}
+          </p>
+          {filtered && (
             <Button
-              variant="light"
+              variant="default"
               onClick={() => {
                 setSearch("");
                 setKind("all");
@@ -297,149 +118,41 @@ export function LibraryPage() {
               Clear filters
             </Button>
           )}
-        </Paper>
+        </div>
       )}
-
-      <Modal
-        opened={selected !== null}
-        onClose={() => setSelected(null)}
-        title="Runtime override"
-        centered
-        radius="xl"
-        classNames={{
-          content: "runtime-modal",
-          header: "runtime-modal-header",
-        }}
-      >
-        {selected && (
-          <Stack gap="lg">
-            <div className="runtime-media-summary">
-              <div className="runtime-thumb">
-                {selected.imageUrl ? (
-                  <img
-                    src={apiAssetUrl(selected.imageUrl) ?? undefined}
-                    alt=""
-                  />
-                ) : (
-                  <IconMovie size={24} />
-                )}
-              </div>
-              <div>
-                <Text fw={700}>{selected.title}</Text>
-                <Text size="sm" c="dimmed">
-                  {detailLine(selected)}
-                </Text>
-              </div>
-            </div>
-            <Text size="sm" c="dimmed">
-              Override the duration when the theatrical, director’s, or extended
-              cut differs from the supplied metadata. Clear it to return to
-              automatic metadata.
-            </Text>
-            <NumberInput
-              label="Runtime in minutes"
-              description={`Current source: ${runtimeSourceLabels[selected.runtimeSource]}`}
-              placeholder="e.g. 142"
-              min={0.1}
-              max={1440}
-              decimalScale={1}
-              value={runtimeMinutes}
-              onChange={(value) => {
-                setRuntimeMinutes(value);
-                setRuntimeOrigin("manual");
-              }}
-              leftSection={<IconClockEdit size={16} />}
-            />
-            <TextInput
-              label="Edition label"
-              description="Optional"
-              placeholder="Theatrical, Director’s Cut, Extended…"
-              value={editionLabel}
-              maxLength={80}
-              onChange={(event) => setEditionLabel(event.currentTarget.value)}
-            />
-            <div>
-              <Text size="sm" fw={500} mb={6}>
-                OMDb runtime fallback
-              </Text>
-              <Group align="flex-start" wrap="nowrap">
-                <TextInput
-                  aria-label="IMDb title ID"
-                  placeholder="IMDb ID, e.g. tt0133093"
-                  value={imdbId}
-                  onChange={(event) => {
-                    setImdbId(event.currentTarget.value);
-                    setMetadataFeedback(null);
-                  }}
-                  error={Boolean(imdbId && !/^tt\d{7,10}$/.test(imdbId.trim()))}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  variant="light"
-                  leftSection={<IconSearch size={15} />}
-                  loading={lookupMetadata.isPending}
-                  disabled={!/^tt\d{7,10}$/.test(imdbId.trim())}
-                  onClick={() => lookupMetadata.mutate()}
-                >
-                  Look up
-                </Button>
-              </Group>
-              <Text
-                size="xs"
-                c={lookupMetadata.isError ? "red" : "dimmed"}
-                mt={6}
-              >
-                {metadataFeedback ??
-                  "Uses title-level metadata only; verify alternate cuts against the actual file."}
-              </Text>
-            </div>
-            {runtimeError && (
-              <Text className="form-error" size="sm">
-                {runtimeError}
-              </Text>
-            )}
-            {!selected.id && (
-              <Text className="form-error" size="sm">
-                Add a note to this title before overriding its runtime.
-              </Text>
-            )}
-            <Group justify="space-between" wrap="nowrap">
-              <Button
-                variant="subtle"
-                color="gray"
-                disabled={!selected.id}
-                onClick={() => {
-                  setEditionLabel("");
-                  updateRuntime.mutate({
-                    runtimeSeconds: null,
-                    editionLabel: null,
-                  });
-                }}
-                loading={updateRuntime.isPending}
-              >
-                Use automatic
-              </Button>
-              <Button
-                disabled={
-                  !selected.id ||
-                  runtimeMinutes === "" ||
-                  Number(runtimeMinutes) <= 0
-                }
-                loading={updateRuntime.isPending}
-                onClick={() =>
-                  updateRuntime.mutate({
-                    runtimeSeconds: Math.round(Number(runtimeMinutes) * 60),
-                    editionLabel: editionLabel.trim() || null,
-                    source: runtimeOrigin,
-                  })
-                }
-              >
-                Save runtime
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Modal>
     </div>
+  );
+}
+
+function MovieCard({ movie }: { movie: LibraryMovie }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  return (
+    <Link
+      to="/library/$movieId"
+      params={{ movieId: movie.id }}
+      className="media-card"
+    >
+      {movie.imageUrl && !imageFailed && (
+        <img
+          className="media-thumbnail"
+          src={apiAssetUrl(movie.imageUrl) ?? undefined}
+          alt=""
+          loading="lazy"
+          onError={() => setImageFailed(true)}
+        />
+      )}
+      <div className="media-card-copy">
+        <h2>{movie.title}</h2>
+        {movieContext(movie) && (
+          <p className="media-context">{movieContext(movie)}</p>
+        )}
+        <div className="media-meta-row">
+          <span>
+            {movie.noteCount} {movie.noteCount === 1 ? "note" : "notes"}
+          </span>
+          <IconArrowUpRight size={18} aria-hidden="true" />
+        </div>
+      </div>
+    </Link>
   );
 }

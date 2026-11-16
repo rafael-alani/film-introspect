@@ -1,6 +1,5 @@
 import {
   Avatar,
-  Badge,
   Button,
   Group,
   NumberInput,
@@ -12,12 +11,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import {
-  IconCheck,
-  IconExternalLink,
-  IconLogout,
-  IconRefresh,
-} from "@tabler/icons-react";
+import { IconCheck, IconExternalLink, IconLogout } from "@tabler/icons-react";
 import { noteColors, type NoteColor } from "@film-introspect/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
@@ -111,30 +105,14 @@ export function SettingsPage() {
   return (
     <div className="page settings-page">
       <header className="page-heading">
-        <div>
-          <Text className="eyebrow">CONTROL ROOM</Text>
-          <Title order={1}>Settings</Title>
-          <Text c="dimmed" mt={6}>
-            Tune how Introspect follows your screen.
-          </Text>
-        </div>
-        <Button
-          variant="subtle"
-          color="gray"
-          leftSection={<IconRefresh size={16} />}
-          loading={sourceStatus.isFetching}
-          onClick={() => void sourceStatus.refetch()}
-        >
-          Check services
-        </Button>
+        <Title order={1}>Settings</Title>
       </header>
 
       <section className="settings-section settings-two-column">
         <div className="settings-section-title">
           <Title order={2}>Your Jellyfin server</Title>
           <Text c="dimmed" size="sm">
-            Connect a server to browse its films, choose exact subtitle tracks
-            and follow playback on your device.
+            Browse your films and follow playback.
           </Text>
         </div>
         <Paper
@@ -149,15 +127,12 @@ export function SettingsPage() {
         >
           <Stack gap="md">
             {jellyfin.data?.configured && (
-              <Text fw={650}>
-                Saved connection · {jellyfin.data.serverName}
-              </Text>
+              <Text fw={500}>Connected to {jellyfin.data.serverName}</Text>
             )}
             {!appConfig.data?.authEnabled && (
               <Text size="sm" c="dimmed">
-                This preview uses one shared Local viewer profile. Everyone
-                using it shares this connection. Separate accounts keep their
-                own connections when sign-in is enabled.
+                Local viewer shares this connection and notes with everyone
+                using this app.
               </Text>
             )}
             <TextInput
@@ -181,11 +156,13 @@ export function SettingsPage() {
               autoComplete="off"
               disabled={saveConnection.isPending || disconnect.isPending}
             />
-            <Text size="xs" c="dimmed">
-              Stored encrypted for your profile; saved keys are never shown.
-              Access follows the key’s permissions. Use a personal access token
-              when you only want your own Jellyfin library and sessions.
-            </Text>
+            <details className="secondary-details">
+              <summary>About access tokens</summary>
+              <Text size="sm" c="dimmed">
+                Saved keys are encrypted and never shown. A personal token
+                limits access to your own Jellyfin library and sessions.
+              </Text>
+            </details>
             {jellyfin.isError && (
               <Text role="alert" c="red">
                 {errorMessage(jellyfin.error)}
@@ -235,11 +212,11 @@ export function SettingsPage() {
         <div className="settings-section-title">
           <Title order={2}>OpenSubtitles</Title>
           <Text c="dimmed" size="sm">
-            Subtitle versions for cinema visits and other screens.
+            Subtitles for films watched outside Jellyfin.
           </Text>
         </div>
         <Stack gap="sm">
-          <Text fw={650}>
+          <Text fw={500}>
             {sourceStatus.isPending
               ? "Checking configuration…"
               : sourceStatus.isError
@@ -249,11 +226,18 @@ export function SettingsPage() {
                   : "API key not configured"}
           </Text>
           <Text size="sm" c="dimmed">
-            Managed by the service operator for everyone using this app.{" "}
             {sourceStatus.data?.data.openSubtitlesConfigured
-              ? "Availability is checked when you search for subtitles."
-              : "Ask the operator to connect OpenSubtitles to enable online subtitle lookup."}
+              ? "Subtitle availability is checked when you search."
+              : "Ask the operator to connect OpenSubtitles."}
           </Text>
+          <Button
+            variant="default"
+            style={{ alignSelf: "flex-start" }}
+            loading={sourceStatus.isFetching}
+            onClick={() => void sourceStatus.refetch()}
+          >
+            Check services
+          </Button>
           {sourceStatus.isError && (
             <Text role="alert" c="red">
               {errorMessage(sourceStatus.error)}
@@ -264,10 +248,9 @@ export function SettingsPage() {
 
       <section className="settings-section settings-two-column">
         <div className="settings-section-title">
-          <Text className="eyebrow">NOTE BEHAVIOR</Text>
           <Title order={2}>Reading window</Title>
           <Text c="dimmed" size="sm">
-            Define when a timed note becomes prominent around the live playhead.
+            Highlight notes around the current film time.
           </Text>
         </div>
         <Paper
@@ -300,16 +283,14 @@ export function SettingsPage() {
             />
             <div className="window-inputs">
               <NumberInput
-                label="Show before"
-                description="seconds"
+                label="Show before (seconds)"
                 min={0}
                 max={60}
                 value={lead}
                 onChange={setLead}
               />
               <NumberInput
-                label="Keep after"
-                description="seconds"
+                label="Keep after (seconds)"
                 min={1}
                 max={120}
                 value={trail}
@@ -357,8 +338,7 @@ export function SettingsPage() {
 
       <section className="settings-section settings-two-column account-section">
         <div className="settings-section-title">
-          <Text className="eyebrow">ACCOUNT</Text>
-          <Title order={2}>Private space</Title>
+          <Title order={2}>Account</Title>
         </div>
         <Paper className="settings-card account-card" radius="xl">
           <Avatar radius="xl" color="amber">
@@ -367,11 +347,11 @@ export function SettingsPage() {
               "L")[0]?.toUpperCase()}
           </Avatar>
           <div className="account-copy">
-            <Text fw={650}>{session.data?.user.name || "Local viewer"}</Text>
-            <Text size="xs" c="dimmed">
+            <Text fw={500}>{session.data?.user.name || "Local viewer"}</Text>
+            <Text size="sm" c="dimmed">
               {appConfig.data?.authEnabled
                 ? session.data?.user.email
-                : "Prototype mode · app authentication is off"}
+                : "Shared profile"}
             </Text>
           </div>
           {appConfig.data?.authEnabled ? (
@@ -386,18 +366,11 @@ export function SettingsPage() {
             >
               Sign out
             </Button>
-          ) : (
-            <Badge variant="light" color="gray">
-              Login disabled
-            </Badge>
-          )}
+          ) : null}
         </Paper>
       </section>
 
       <footer className="settings-footer">
-        <Text size="xs" c="dimmed">
-          Introspect · your self-hosted film companion
-        </Text>
         <Button
           component="a"
           href={`${apiBaseUrl}/api/health`}
@@ -405,7 +378,7 @@ export function SettingsPage() {
           rel="noreferrer"
           variant="subtle"
           color="gray"
-          size="compact-xs"
+          size="sm"
           rightSection={<IconExternalLink size={13} />}
         >
           API status

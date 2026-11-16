@@ -6,6 +6,8 @@ import {
   createNoteInputSchema,
   healthResponseSchema,
   mediaListResponseSchema,
+  libraryListResponseSchema,
+  libraryMovieResponseSchema,
   mediaSchema,
   metadataLookupInputSchema,
   metadataLookupResponseSchema,
@@ -54,6 +56,8 @@ import {
   getSettings,
   hasJellyfinItem,
   listMedia,
+  listLibrary,
+  getLibraryMovie,
   listNotes,
   updateNote,
   updateRuntime,
@@ -408,6 +412,24 @@ api.patch(
       ),
     ),
 );
+
+api.get("/library", async (c) =>
+  c.json(
+    libraryListResponseSchema.parse({
+      items: await listLibrary(c.get("authUser").id),
+    }),
+  ),
+);
+
+api.get("/library/:mediaId", async (c) => {
+  const result = await getLibraryMovie(
+    c.get("authUser").id,
+    c.req.param("mediaId"),
+  );
+  if (!result)
+    return errorResponse(c, 404, "MEDIA_NOT_FOUND", "Movie not found");
+  return c.json(libraryMovieResponseSchema.parse(result));
+});
 
 api.get("/media", async (c) =>
   c.json(

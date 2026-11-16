@@ -1,5 +1,7 @@
 import {
   type CreateNoteInput,
+  type LibraryMovie,
+  type LibraryMovieResponse,
   type Media,
   type MediaSummary,
   type Note,
@@ -9,9 +11,10 @@ import {
   type UserSettings,
   userSettingsSchema,
 } from "@film-introspect/contracts";
-import { and, asc, count, desc, eq, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, max } from "drizzle-orm";
 import { db } from "../db";
 import { mediaItems, notes, userSettings } from "../db/schema";
+import { groupLibraryMovies } from "./library";
 
 type MediaRow = typeof mediaItems.$inferSelect;
 type NoteRow = typeof notes.$inferSelect;
@@ -196,7 +199,7 @@ export async function resolveMedia(
   return mediaRowToContract(created);
 }
 
-export async function listMedia(userId: string): Promise<MediaSummary[]> {
+async function mediaSummaries(userId: string) {
   const rows = await db
     .select({
       media: mediaItems,
@@ -210,12 +213,11 @@ export async function listMedia(userId: string): Promise<MediaSummary[]> {
     )
     .where(eq(mediaItems.userId, userId))
     .groupBy(mediaItems.id)
-    .orderBy(desc(mediaItems.lastSeenAt))
-    .limit(100);
+    .orderBy(desc(mediaItems.lastSeenAt));
 
   return rows.map((row) => {
     const lastNotedAt: unknown = row.lastNotedAt;
-    return {
+    const summary: MediaSummary = {
       ...mediaRowToContract(row.media),
       noteCount: row.noteCount,
       lastNotedAt:
@@ -225,7 +227,50 @@ export async function listMedia(userId: string): Promise<MediaSummary[]> {
             ? null
             : new Date(Number(lastNotedAt)).toISOString(),
     };
+    return {
+      summary,
+      sourceItemKey: JSON.stringify([
+        row.media.jellyfinServerKey,
+        row.media.jellyfinItemId,
+      ]),
+    };
   });
+}
+
+export async function listMedia(userId: string): Promise<MediaSummary[]> {
+  return (await mediaSummaries(userId)).map((item) => item.summary);
+}
+
+export async function listLibrary(userId: string): Promise<LibraryMovie[]> {
+  const items = await mediaSummaries(userId);
+  return groupLibraryMovies(
+    items.map((item) => item.summary),
+    new Map(items.map((item) => [item.summary.id!, item.sourceItemKey])),
+  );
+}
+
+export async function getLibraryMovie(
+  userId: string,
+  mediaId: string,
+): Promise<LibraryMovieResponse | null> {
+  const movie = (await listLibrary(userId)).find((item) =>
+    item.versions.some((version) => version.id === mediaId),
+  );
+  if (!movie) return null;
+  const rows = await db
+    .select()
+    .from(notes)
+    .where(
+      and(
+        eq(notes.userId, userId),
+        inArray(
+          notes.mediaId,
+          movie.versions.map((version) => version.id),
+        ),
+      ),
+    )
+    .orderBy(asc(notes.atSeconds), asc(notes.createdAt), asc(notes.id));
+  return { movie, notes: rows.map(noteRowToContract) };
 }
 
 export async function findMedia(
